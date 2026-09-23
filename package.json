@@ -2,7 +2,7 @@
   "name": "wormgpt",
   "version": "0.1.0",
   "private": true,
-  "description": "WormGPT - production-grade AI chat platform",
+  "description": "worm-ai — chat + Worm Agent coding mode. © 3MH Technologies — https://3mh.pages.dev — t.me/j49_c",
   "workspaces": [
     "apps/*",
     "packages/*"

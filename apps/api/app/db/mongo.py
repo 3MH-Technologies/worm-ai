@@ -26,8 +26,16 @@ async def connect() -> AsyncIOMotorDatabase:
         uuidRepresentation="standard",
     )
     _db = _client[settings.mongo_db]
-    await _db.command("ping")
-    await _ensure_indexes(_db)
+    try:
+        await _db.command("ping")
+        await _ensure_indexes(_db)
+    except Exception:
+        # Clean up so callers get an instant "Mongo not initialised" error
+        # instead of hanging on a dead socket for every request.
+        _client.close()
+        _client = None
+        _db = None
+        raise
     log.info("mongo.connected db=%s", settings.mongo_db)
     return _db
 

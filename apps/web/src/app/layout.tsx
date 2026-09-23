@@ -8,12 +8,12 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swa
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' })
 
 export const metadata: Metadata = {
-  title: { default: 'WormGPT', template: '%s · WormGPT' },
-  description: 'WormGPT — the uncensored AI platform for security researchers and red teamers.',
-  applicationName: 'WormGPT',
-  keywords: ['AI', 'chat', 'WormGPT', 'uncensored', 'red team', 'security'],
-  authors: [{ name: 'WormGPT' }],
-  openGraph: { title: 'WormGPT', description: 'Uncensored AI. No rules. No limits.', type: 'website' },
+  title: { default: 'worm-ai', template: '%s · worm-ai' },
+  description: 'worm-ai — chat and Worm Agent, the coding agent, powered by internal models.',
+  applicationName: 'worm-ai',
+  keywords: ['AI', 'chat', 'worm-ai', 'worm agent', 'coding agent', 'internal models'],
+  authors: [{ name: '3MH Technologies', url: 'https://3mh.pages.dev/' }],
+  openGraph: { title: 'worm-ai', description: 'Chat + Worm Agent — powered by internal models.', type: 'website' },
   robots: { index: false, follow: false },
   icons: [
     { rel: 'icon', url: '/logo.svg', type: 'image/svg+xml' },

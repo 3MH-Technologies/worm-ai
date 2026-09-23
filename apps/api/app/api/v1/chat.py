@@ -14,8 +14,6 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, R
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import current_user, enforce_approval, rate_limit
-from app.api.v1.memory import gather_for_chat
-from app.core.crypto import decrypt
 from app.core.config import get_settings
 from app.db import mongo
 from app.models.chat import (
@@ -30,8 +28,7 @@ from app.models.chat import (
     MessageOut,
     MessageReaction,
 )
-from app.providers import get_provider
-from app.providers.base import ChatMessage, ChatRequest
+from app.services import notrack
 from app.services.audit import log_action
 
 log = logging.getLogger(__name__)
@@ -113,6 +110,7 @@ def _conv_out(doc: dict, msg_count: int = 0) -> ConversationOut:
         userId=str(doc["userId"]),
         title=doc.get("title") or "New chat",
         modelId=str(doc["modelId"]) if doc.get("modelId") else None,
+        mode=doc.get("mode", "chat"),
         folderId=str(doc["folderId"]) if doc.get("folderId") else None,
         favorite=doc.get("favorite", False),
         shared=doc.get("shared", False),
@@ -151,10 +149,14 @@ async def list_conversations(
 async def create_conversation(payload: ConversationCreate, user=Depends(current_user)) -> ConversationOut:
     await enforce_approval(user)
     now = datetime.now(tz=timezone.utc)
+    model_id = (payload.modelId or "").strip()
+    if len(model_id) == 1:
+        model_id = model_id.upper()  # notrack single-letter codes
     doc = {
         "userId": user["_id"],
         "title": payload.title or "New chat",
-        "modelId": ObjectId(payload.modelId) if payload.modelId else None,
+        "modelId": model_id or None,
+        "mode": payload.mode,
         "folderId": ObjectId(payload.folderId) if payload.folderId else None,
         "favorite": False,
         "shared": False,
@@ -226,6 +228,8 @@ async def post_message(cid: str, payload: MessageCreate, user=Depends(current_us
     """Non-streaming message send. Returns the saved user message; assistant reply
     can be fetched via /stream. Prefer /stream for chat UX."""
     await enforce_approval(user)
+    if not payload.content.strip():
+        raise HTTPException(400, "message content is required")
     conv = await mongo.conversations().find_one({"_id": ObjectId(cid), "userId": user["_id"]})
     if not conv:
         raise HTTPException(404, "conversation not found")
@@ -308,55 +312,14 @@ async def react_message(cid: str, mid: str, payload: MessageReaction, user=Depen
     )
 
 
-# ---- Streaming ----
-async def _build_messages(conv: dict, user_content: str) -> list[ChatMessage]:
-    history = await mongo.messages().find({"conversationId": conv["_id"]}).sort("createdAt", 1).to_list(length=400)
-    msgs: list[ChatMessage] = []
-    for m in history:
-        if m["role"] in ("user", "assistant", "system", "tool"):
-            msgs.append(ChatMessage(role=m["role"], content=m["content"]))
-    msgs.append(ChatMessage(role="user", content=user_content))
-    return msgs
-
-
-async def _resolve_provider(conv: dict, requested_model_id: str | None, user: dict) -> tuple[Any, dict]:
-    """Returns (provider, model_doc)."""
-    model_id = requested_model_id or (str(conv["modelId"]) if conv.get("modelId") else None)
-    if model_id:
-        m = await mongo.models_col().find_one({"_id": ObjectId(model_id)})
-        if not m or not m.get("enabled"):
-            raise HTTPException(400, "model unavailable")
-    else:
-        m = await mongo.models_col().find_one({"enabled": True}, sort=[("name", 1)])
-        if not m:
-            raise HTTPException(400, "no models configured")
-    api_key = decrypt(m.get("encryptedApiKey") or "")
-    if not api_key and m["provider"] != "ollama":
-        raise HTTPException(400, "model has no API key configured")
-    return get_provider(m["provider"], api_key=api_key, endpoint=m.get("endpoint")), m
-
-
-async def _build_system_prompt(model_doc: dict, user: dict, conversation_id: ObjectId) -> str:
-    from app.services.prompt_guard import assemble, sanitize_memory
-    parts: list[str] = []
-    if model_doc.get("systemPromptId"):
-        prompt = await mongo.system_prompts().find_one({"_id": model_doc["systemPromptId"]})
-        if prompt:
-            for v in prompt.get("versions", []):
-                if v["version"] == prompt.get("currentVersion", 1):
-                    parts.append(v["content"])
-                    break
-    # memory slices — sanitised
-    grouped = await gather_for_chat(user["_id"], conversation_id)
-    if grouped.get("long_term"):
-        parts.append("Long-term memory:\n- " + "\n- ".join(sanitize_memory(m) for m in grouped["long_term"]))
-    if grouped.get("preference"):
-        parts.append("User preferences:\n- " + "\n- ".join(sanitize_memory(m) for m in grouped["preference"]))
-    if grouped.get("summary"):
-        parts.append("Conversation summaries (older context):\n- " + "\n- ".join(sanitize_memory(m) for m in grouped["summary"][:3]))
-    if grouped.get("context"):
-        parts.append("Relevant context:\n- " + "\n- ".join(sanitize_memory(m) for m in grouped["context"][:5]))
-    return assemble(parts, max_chars=8000)
+# ---- Streaming (internal chat backend) ----
+def _resolve_model_code(conv: dict, requested_model_id: str | None) -> str:
+    """Resolve the notrack model code (A/B/C/F) for this turn."""
+    settings = get_settings()
+    code = str(requested_model_id or conv.get("modelId") or settings.notrack_model or "C").strip().upper()
+    if code not in notrack.NOTRACK_MODELS:
+        code = settings.notrack_model if settings.notrack_model in notrack.NOTRACK_MODELS else "C"
+    return code
 
 
 @router.post("/conversations/{cid}/stream")
@@ -373,52 +336,61 @@ async def stream_message(
     if not conv:
         raise HTTPException(404, "conversation not found")
 
-    # Persist user message
+    settings = get_settings()
+    model_code = _resolve_model_code(conv, payload.modelId)
+    model_name = notrack.NOTRACK_MODELS[model_code]
+    regenerate = bool(payload.regenerate)
+    content = (payload.content or "").strip()
+    if not regenerate and not content:
+        raise HTTPException(400, "message content is required")
+
     now = datetime.now(tz=timezone.utc)
-    user_msg_doc = {
-        "conversationId": conv["_id"],
-        "userId": user["_id"],
-        "role": "user",
-        "content": payload.content,
-        "tokens": None,
-        "model": None,
-        "metadata": {"attachments": payload.attachments or []},
-        "parentId": ObjectId(payload.parentId) if payload.parentId else None,
-        "createdAt": now,
-    }
-    user_msg_res = await mongo.messages().insert_one(user_msg_doc)
-    user_msg_id = user_msg_res.inserted_id
+    user_msg_id: ObjectId | None = None
+    if not regenerate:
+        # Persist user message
+        user_msg_doc = {
+            "conversationId": conv["_id"],
+            "userId": user["_id"],
+            "role": "user",
+            "content": content,
+            "tokens": None,
+            "model": None,
+            "metadata": {"attachments": payload.attachments or []},
+            "parentId": ObjectId(payload.parentId) if payload.parentId else None,
+            "createdAt": now,
+        }
+        user_msg_res = await mongo.messages().insert_one(user_msg_doc)
+        user_msg_id = user_msg_res.inserted_id
 
-    # Update conversation meta
-    title_update = {}
-    if conv.get("title") in (None, "New chat"):
-        title_update["title"] = payload.content[:48] + ("…" if len(payload.content) > 48 else "")
-    await mongo.conversations().update_one(
-        {"_id": conv["_id"]},
-        {"$set": {"updatedAt": now, "lastMessageAt": now, **title_update}},
-    )
+        # Update conversation meta
+        title_update: dict[str, Any] = {"modelId": model_code}
+        if conv.get("title") in (None, "New chat"):
+            title_update["title"] = content[:48] + ("…" if len(content) > 48 else "")
+        await mongo.conversations().update_one(
+            {"_id": conv["_id"]},
+            {"$set": {"updatedAt": now, "lastMessageAt": now, **title_update}},
+        )
+    else:
+        # Regenerating: drop the previous assistant reply locally so the UI replaces it.
+        last_assistant = await mongo.messages().find_one(
+            {"conversationId": conv["_id"], "role": "assistant"}, sort=[("createdAt", -1)]
+        )
+        if last_assistant:
+            await mongo.messages().delete_one({"_id": last_assistant["_id"]})
 
-    provider, model_doc = await _resolve_provider(conv, payload.modelId, user)
-    system_prompt = await _build_system_prompt(model_doc, user, conv["_id"])
-    if payload.webSearch:
-        search_text = await _web_search_for_chat(payload.content)
+    # Server-side context lives in the notrack chat; its id is kept on the conversation.
+    nt_chat_id: str | None = conv.get("notrackChatId")
+
+    content_to_send = content
+    if payload.webSearch and content:
+        search_text = await _web_search_for_chat(content)
         if search_text:
-            web_block = f"\n\n## Current Web Search Results\n\n{search_text}"
-            system_prompt = (system_prompt + web_block) if system_prompt else web_block
-    history = await _build_messages(conv, payload.content)
+            content_to_send = f"{content}\n\n## Current Web Search Results\n\n{search_text}"
 
-    req = ChatRequest(
-        model=model_doc["name"],
-        messages=history,
-        temperature=model_doc.get("temperature", 0.7),
-        max_tokens=model_doc.get("maxTokens", 4096),
-        top_p=model_doc.get("topP", 1.0),
-        stream=True,
-        user=str(user["_id"]),
-        system_prompt=system_prompt or None,
-    )
+    client = notrack.get_notrack()
 
     async def event_gen():
+        nonlocal nt_chat_id
         buffer: list[str] = []
         start = time.perf_counter()
         first_token_at: float | None = None
@@ -426,22 +398,44 @@ async def stream_message(
         assistant_id: ObjectId | None = None
         try:
             yield {"event": "start", "data": json.dumps({
-                "userMessageId": str(user_msg_id),
-                "model": model_doc["name"],
-                "provider": model_doc["provider"],
+                "userMessageId": str(user_msg_id) if user_msg_id else None,
+                "model": model_name,
+                "provider": "internal",
             })}
-            async for chunk in provider.stream(req):
+            async for ev in client.stream_dispatch(
+                content_to_send,
+                chat_id=nt_chat_id,
+                model=model_code,
+                persona=settings.notrack_persona,
+                max_turns=settings.notrack_max_turns,
+                regenerate=regenerate,
+            ):
                 if await request.is_disconnected():
                     break
-                if first_token_at is None and chunk.delta:
-                    first_token_at = time.perf_counter()
-                if chunk.delta:
-                    buffer.append(chunk.delta)
-                    yield {"event": "delta", "data": json.dumps({"text": chunk.delta})}
-                if chunk.finish_reason:
-                    finish_reason = chunk.finish_reason
-                    yield {"event": "finish", "data": json.dumps({"reason": finish_reason})}
-                    break
+                et = ev["type"]
+                if et == "chat_meta":
+                    new_chat_id = ev.get("chat_id")
+                    if new_chat_id and new_chat_id != nt_chat_id:
+                        nt_chat_id = new_chat_id
+                        await mongo.conversations().update_one(
+                            {"_id": conv["_id"]}, {"$set": {"notrackChatId": new_chat_id}}
+                        )
+                elif et == "delta":
+                    text = ev["text"]
+                    if first_token_at is None:
+                        first_token_at = time.perf_counter()
+                    buffer.append(text)
+                    yield {"event": "delta", "data": json.dumps({"text": text})}
+                elif et == "turn_end":
+                    # Separate multi-speaker turns (Synthesis mode) visually.
+                    if buffer and not "".join(buffer).endswith("\n\n"):
+                        buffer.append("\n\n")
+                        yield {"event": "delta", "data": json.dumps({"text": "\n\n"})}
+                elif et == "error":
+                    yield {"event": "error", "data": json.dumps({"message": ev.get("message") or "upstream error"})}
+            if finish_reason is None:
+                finish_reason = "stop"
+                yield {"event": "finish", "data": json.dumps({"reason": "stop"})}
         except asyncio.CancelledError:
             finish_reason = "cancelled"
         except Exception as e:
@@ -458,13 +452,13 @@ async def stream_message(
                 "userId": user["_id"],
                 "role": "assistant",
                 "content": full,
-                "tokens": provider.count_tokens(full),
-                "model": model_doc["name"],
+                "tokens": notrack.count_tokens(full),
+                "model": model_name,
                 "metadata": {
                     "latency_ms": int((time.perf_counter() - start) * 1000),
                     "ttft_ms": int(((first_token_at or time.perf_counter()) - start) * 1000),
                     "finish_reason": finish_reason,
-                    "provider": model_doc["provider"],
+                    "provider": "internal",
                 },
                 "parentId": user_msg_id,
                 "createdAt": now2,
@@ -481,7 +475,7 @@ async def stream_message(
                     "title": canvas_title,
                     "type": "document",
                     "content": full,
-                    "metadata": {"source": "chat", "conversationId": str(conv["_id"]), "model": model_doc["name"], "provider": model_doc["provider"]},
+                    "metadata": {"source": "chat", "conversationId": str(conv["_id"]), "model": model_name, "provider": "internal"},
                     "conversationId": conv["_id"],
                     "currentVersion": 1,
                     "createdAt": now2,
@@ -507,7 +501,7 @@ async def stream_message(
             if canvas_id:
                 done_data["canvasId"] = str(canvas_id)
             yield {"event": "done", "data": json.dumps(done_data)}
-            background.add_task(_track_usage, user["_id"], assistant_doc["tokens"], model_doc["provider"])
+            background.add_task(_track_usage, user["_id"], assistant_doc["tokens"], "internal")
 
     return EventSourceResponse(event_gen())
 

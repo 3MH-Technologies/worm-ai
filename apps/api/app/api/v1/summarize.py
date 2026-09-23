@@ -5,16 +5,13 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Iterable
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import current_user
-from app.core.crypto import decrypt
 from app.db import mongo
-from app.providers import get_provider
-from app.providers.base import ChatMessage, ChatRequest
+from app.services import notrack
 from app.services.audit import log_action
 
 log = logging.getLogger(__name__)
@@ -28,19 +25,6 @@ SUMMARIZE_PROMPT = (
 )
 
 
-async def _pick_model(model_id: str | None, user_id: ObjectId) -> dict:
-    if model_id:
-        m = await mongo.models_col().find_one({"_id": ObjectId(model_id)})
-        if m and m.get("enabled"):
-            return m
-    m = await mongo.models_col().find_one({"enabled": True, "provider": "groq"})
-    if not m:
-        m = await mongo.models_col().find_one({"enabled": True})
-    if not m:
-        raise HTTPException(400, "no model available")
-    return m
-
-
 @router.post("/conversations/{cid}/summarize", status_code=201)
 async def summarize(cid: str, user=Depends(current_user)) -> dict:
     conv = await mongo.conversations().find_one({"_id": ObjectId(cid), "userId": user["_id"]})
@@ -50,25 +34,11 @@ async def summarize(cid: str, user=Depends(current_user)) -> dict:
     if len(msgs) < 6:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "conversation too short to summarize")
 
-    model_doc = await _pick_model(None, user["_id"])
-    api_key = decrypt(model_doc.get("encryptedApiKey") or "")
-    if not api_key and model_doc["provider"] != "ollama":
-        raise HTTPException(400, "no model with API key available")
-
     history_text = "\n\n".join(
         f"[{m['role']}] {m['content'][:2000]}" for m in msgs[-200:]
     )
-    req = ChatRequest(
-        model=model_doc["name"],
-        messages=[ChatMessage(role="user", content=history_text)],
-        system_prompt=SUMMARIZE_PROMPT,
-        temperature=0.2,
-        max_tokens=600,
-        stream=False,
-        user=str(user["_id"]),
-    )
-    provider = get_provider(model_doc["provider"], api_key=api_key, endpoint=model_doc.get("endpoint"))
-    summary, _ = await provider.complete(req)
+    # Fresh notrack chat (no chat_id) so the summary request doesn't pollute the conversation.
+    summary, _ = await notrack.get_notrack().complete(f"{SUMMARIZE_PROMPT}\n\n{history_text}")
 
     now = datetime.now(tz=timezone.utc)
     # remove old summaries for this conversation
@@ -95,5 +65,5 @@ async def summarize(cid: str, user=Depends(current_user)) -> dict:
         "id": str(res.inserted_id),
         "summary": summary.strip(),
         "messages": len(msgs),
-        "model": model_doc["name"],
+        "model": "notrack",
     }

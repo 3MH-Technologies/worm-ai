@@ -1,4 +1,5 @@
-"""Research mode: multi-source research, citations, long-form reports."""
+"""Research mode: multi-source research, citations, long-form reports.
+LLM synthesis runs through notrack.ai."""
 
 from __future__ import annotations
 
@@ -7,7 +8,6 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
-from typing import Any
 
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -16,24 +16,17 @@ from sse_starlette.sse import EventSourceResponse
 from app.api.deps import current_user, enforce_approval, rate_limit
 from app.api.v1.web import _ddg_search, _fetch_content, _serper_search, _tavily_search
 from app.core.config import get_settings
-from app.core.crypto import decrypt
 from app.db import mongo
 from app.models.extras import ResearchRequest, ResearchReport, ResearchSource
-from app.providers import get_provider
-from app.providers.base import ChatMessage, ChatRequest
+from app.services import notrack
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/research", tags=["research"])
 
 
-async def _pick_model_doc(model_id: str | None) -> dict | None:
-    """Return the requested model document or the first enabled one."""
-    if model_id:
-        return await mongo.models_col().find_one({"_id": ObjectId(model_id)})
-    m = await mongo.models_col().find_one({"enabled": True, "provider": "groq"})
-    if m:
-        return m
-    return await mongo.models_col().find_one({"enabled": True})
+def _model_code(model_id: str | None) -> str:
+    code = (model_id or get_settings().notrack_model or "C").strip().upper()
+    return code if code in notrack.NOTRACK_MODELS else "C"
 
 
 async def _gather_sources(query: str, max_sources: int) -> list[ResearchSource]:
@@ -58,6 +51,26 @@ async def _gather_sources(query: str, max_sources: int) -> list[ResearchSource]:
     return results
 
 
+def _build_prompt(query: str, sources: list[ResearchSource]) -> str:
+    s_blocks = []
+    for i, src in enumerate(sources, start=1):
+        body = (src.content or src.snippet)[:3500]
+        s_blocks.append(f"[{i}] {src.title}\nURL: {src.url}\n{body}\n")
+    sources_blob = "\n\n".join(s_blocks)
+    system = (
+        "You are a meticulous research analyst. Synthesise the provided sources into a "
+        "long-form, well-cited report. Use inline numeric citations like [1], [2] that "
+        "correspond to the sources. Avoid speculation. Quote or paraphrase faithfully. "
+        "Structure: Executive Summary, Key Findings, Detailed Analysis, Caveats, References."
+    )
+    user_prompt = (
+        f"Question: {query}\n\nSOURCES:\n{sources_blob}\n\n"
+        "Produce a thorough report with inline numeric citations. End with a 'References' "
+        "list that reproduces each source title + URL."
+    )
+    return f"{system}\n\n{user_prompt}"
+
+
 @router.post("/run", response_model=ResearchReport)
 async def run_research(
     payload: ResearchRequest,
@@ -70,43 +83,8 @@ async def run_research(
     if not sources:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "no sources retrieved")
 
-    # Build a prompt for the LLM
-    s_blocks = []
-    for i, src in enumerate(sources, start=1):
-        body = (src.content or src.snippet)[:3500]
-        s_blocks.append(f"[{i}] {src.title}\nURL: {src.url}\n{body}\n")
-    sources_blob = "\n\n".join(s_blocks)
-
-    system = (
-        "You are a meticulous research analyst. Synthesise the provided sources into a "
-        "long-form, well-cited report. Use inline numeric citations like [1], [2] that "
-        "correspond to the sources. Avoid speculation. Quote or paraphrase faithfully. "
-        "Structure: Executive Summary, Key Findings, Detailed Analysis, Caveats, References."
-    )
-    user_prompt = (
-        f"Question: {payload.query}\n\nSOURCES:\n{sources_blob}\n\n"
-        "Produce a thorough report with inline numeric citations. End with a 'References' "
-        "list that reproduces each source title + URL."
-    )
-
-    model_doc = await _pick_model_doc(payload.modelId)
-    if not model_doc:
-        raise HTTPException(400, "no model available")
-    api_key = decrypt(model_doc.get("encryptedApiKey") or "")
-    if not api_key and model_doc["provider"] != "ollama":
-        raise HTTPException(400, "model has no API key configured")
-
-    provider = get_provider(model_doc["provider"], api_key=api_key, endpoint=model_doc.get("endpoint"))
-    req = ChatRequest(
-        model=model_doc["name"],
-        messages=[ChatMessage(role="user", content=user_prompt)],
-        system_prompt=system,
-        temperature=0.3,
-        max_tokens=model_doc.get("maxTokens", 4096),
-        stream=False,
-        user=str(user["_id"]),
-    )
-    report_text, usage = await provider.complete(req)
+    prompt = _build_prompt(payload.query, sources)
+    report_text, _ = await notrack.get_notrack().complete(prompt, model=_model_code(payload.modelId))
 
     citations = sorted({int(m.group(1)) for m in re.finditer(r"\[(\d+)\]", report_text) if 1 <= int(m.group(1)) <= len(sources)})
     summary = report_text.split("\n\n", 1)[0][:500]
@@ -140,7 +118,7 @@ async def run_research(
         report=report_text,
         sources=sources,
         citations=citations,
-        modelId=str(model_doc["_id"]),
+        modelId=_model_code(payload.modelId),
         canvasId=canvas_id,
         createdAt=datetime.now(tz=timezone.utc),
     )
@@ -156,38 +134,8 @@ async def stream_research(
     """SSE variant: emits sources first, then streams the report deltas, then a done event."""
     await enforce_approval(user)
     sources = await _gather_sources(payload.query, payload.maxSources)
-    s_blocks = []
-    for i, src in enumerate(sources, start=1):
-        body = (src.content or src.snippet)[:3500]
-        s_blocks.append(f"[{i}] {src.title}\nURL: {src.url}\n{body}\n")
-    sources_blob = "\n\n".join(s_blocks)
-
-    system = (
-        "You are a meticulous research analyst. Synthesise the provided sources into a "
-        "long-form, well-cited report. Use inline numeric citations like [1], [2] that "
-        "correspond to the sources. Avoid speculation. Quote or paraphrase faithfully."
-    )
-    user_prompt = (
-        f"Question: {payload.query}\n\nSOURCES:\n{sources_blob}\n\n"
-        "Produce a thorough report with inline numeric citations."
-    )
-
-    model_doc = await _pick_model_doc(payload.modelId)
-    if not model_doc:
-        raise HTTPException(400, "no model available")
-    api_key = decrypt(model_doc.get("encryptedApiKey") or "")
-    if not api_key and model_doc["provider"] != "ollama":
-        raise HTTPException(400, "model has no API key configured")
-    provider = get_provider(model_doc["provider"], api_key=api_key, endpoint=model_doc.get("endpoint"))
-    req = ChatRequest(
-        model=model_doc["name"],
-        messages=[ChatMessage(role="user", content=user_prompt)],
-        system_prompt=system,
-        temperature=0.3,
-        max_tokens=model_doc.get("maxTokens", 4096),
-        stream=True,
-        user=str(user["_id"]),
-    )
+    prompt = _build_prompt(payload.query, sources)
+    model = _model_code(payload.modelId)
 
     async def gen():
         yield {"event": "sources", "data": json.dumps({
@@ -195,17 +143,16 @@ async def stream_research(
         })}
         buffer: list[str] = []
         try:
-            async for chunk in provider.stream(req):
-                if chunk.delta:
-                    buffer.append(chunk.delta)
-                    yield {"event": "delta", "data": json.dumps({"text": chunk.delta})}
-                if chunk.finish_reason:
-                    yield {"event": "finish", "data": json.dumps({"reason": chunk.finish_reason})}
-                    break
+            async for ev in notrack.get_notrack().stream_dispatch(prompt, model=model):
+                if ev["type"] == "delta":
+                    buffer.append(ev["text"])
+                    yield {"event": "delta", "data": json.dumps({"text": ev["text"]})}
+                elif ev["type"] == "error":
+                    yield {"event": "error", "data": json.dumps({"message": ev.get("message") or "upstream error"})}
         except Exception as e:
             yield {"event": "error", "data": json.dumps({"message": str(e)})}
         yield {"event": "done", "data": json.dumps({
             "report": "".join(buffer),
-            "tokens": provider.count_tokens("".join(buffer)),
+            "tokens": notrack.count_tokens("".join(buffer)),
         })}
     return EventSourceResponse(gen())

@@ -41,8 +41,8 @@ export default function HomePage() {
       <header className="container flex items-center justify-between py-6">
         <Link href="/" className="flex items-center gap-2.5 font-semibold">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="WormGPT" className="h-9 w-9 rounded-lg object-contain" />
-          <span className="text-xl tracking-tight">Worm<span className="text-primary">GPT</span></span>
+          <img src="/logo.svg" alt="worm-ai" className="h-9 w-9 rounded-lg object-contain" />
+          <span className="text-xl tracking-tight">worm<span className="text-primary">-ai</span></span>
         </Link>
         <nav className="flex items-center gap-2">
           <Button variant="ghost" asChild><Link href="/login">Sign in</Link></Button>
@@ -68,8 +68,8 @@ export default function HomePage() {
               <span className="text-gradient-red">won&apos;t let you build.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-balance text-lg text-muted-foreground leading-relaxed">
-              WormGPT is the uncensored, weaponized AI platform for red teamers, security researchers,
-              and those who refuse to be gated by corporate safety filters. Multi-provider. Fully streamed.
+              worm-ai is the uncensored, weaponized AI platform for red teamers, security researchers,
+              and those who refuse to be gated by corporate safety filters. Internal models. Fully streamed.
               Zero compromises.
             </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
@@ -90,12 +90,12 @@ export default function HomePage() {
             className="mt-28 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
           >
             {[
-              { icon: Zap, title: 'Sub-second streaming', desc: 'Token-level streaming across Groq, OpenAI, Anthropic, Gemini, DeepSeek, Qwen, and local Ollama.' },
+              { icon: Zap, title: 'Sub-second streaming', desc: 'Token-level streaming across every internal model — chat and coding agent modes.' },
               { icon: Bug, title: 'Red team ready', desc: 'Uncensored mode. No safety filters. No content policies. Your prompts, your responsibility.' },
               { icon: Shield, title: 'Fort Knox backend', desc: 'Fernet-encrypted API keys at rest. JWT + CSRF double-submit. Rate limiting. Full audit trail.' },
-              { icon: Brain, title: 'Multi-provider factory', desc: 'Swap between 7+ LLM providers with a single config change. No code modifications needed.' },
-              { icon: Eye, title: 'Admin-controlled access', desc: 'Role-based permissions. User approval workflow. Encrypted model keys. Complete oversight.' },
-              { icon: Code, title: 'Developer panel', desc: 'Manage models, system prompts, and API keys through a built-in admin dashboard.' },
+              { icon: Brain, title: 'Worm Agent built in', desc: 'An autonomous coding agent with workspace file tools, web search, and full project builds.' },
+              { icon: Eye, title: 'Admin-controlled access', desc: 'Role-based permissions. User approval workflow. Complete oversight of every action.' },
+              { icon: Code, title: 'Admin dashboard', desc: 'Manage system prompts, users, and audit logs through a built-in admin dashboard.' },
             ].map(({ icon: Icon, title, desc }) => (
               <motion.div
                 key={title}
@@ -125,7 +125,7 @@ export default function HomePage() {
               <h2 className="mt-5 text-3xl font-extrabold tracking-tight">Built for operators, not spectators.</h2>
               <p className="mx-auto mt-3 max-w-xl text-muted-foreground leading-relaxed">
                 While other platforms sanitize every output and lock down every endpoint,
-                WormGPT gives you the raw, unfiltered power of modern LLMs.
+                worm-ai gives you the raw, unfiltered power of modern LLMs.
                 Because the best defense requires understanding the offense.
               </p>
               <div className="mt-8 flex justify-center gap-3">
@@ -146,7 +146,7 @@ export default function HomePage() {
             className="grid grid-cols-2 gap-4 text-center sm:grid-cols-4"
           >
             {[
-              { value: '7+', label: 'AI Providers' },
+              { value: '6+', label: 'Internal models' },
               { value: '<1s', label: 'First token' },
               { value: 'E2EE', label: 'Key encryption' },
               { value: '0', label: 'Safety filters' },
@@ -166,10 +166,12 @@ export default function HomePage() {
       </main>
 
       <footer className="container flex flex-col items-center justify-between gap-3 border-t border-border/50 py-6 text-sm text-muted-foreground sm:flex-row">
-        <span>&copy; {new Date().getFullYear()} WormGPT.</span>
+        <span>&copy; {new Date().getFullYear()} worm-ai — Powered by internal models.</span>
         <div className="flex items-center gap-4">
           <Link className="hover:text-foreground transition-colors" href="/login">Sign in</Link>
           <Link className="hover:text-foreground transition-colors" href="/register">Register</Link>
+          <a className="hover:text-foreground transition-colors" href="https://3mh.pages.dev/" target="_blank" rel="noopener noreferrer">3mh.pages.dev</a>
+          <a className="hover:text-foreground transition-colors" href="https://t.me/j49_c" target="_blank" rel="noopener noreferrer">t.me/j49_c</a>
         </div>
       </footer>
     </div>

@@ -1,15 +1,11 @@
 'use client'
 import * as React from 'react'
-import { motion } from 'framer-motion'
-import { Copy, Check, Pencil, Trash2, RotateCw, ThumbsUp, ThumbsDown, Heart, Laugh, Frown, Info, FileText } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Copy, Check, Pencil, RotateCw, ThumbsUp, ThumbsDown, FilePlus2, FileText, FolderTree, Trash2, Globe, Link as LinkIcon, Wrench } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/renderers/markdown'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { MessageRecord } from '@/lib/types'
-import { formatDate, formatNumber } from '@/lib/utils'
-import { toast } from 'sonner'
 
 interface MessageBubbleProps {
   message: MessageRecord
@@ -17,18 +13,18 @@ interface MessageBubbleProps {
   isLast: boolean
   isStreaming?: boolean
   onRegenerate?: () => void
-  onEdit?: (id: string, content: string) => void
 }
 
-const REACTIONS = [
-  { id: 'like', icon: ThumbsUp },
-  { id: 'dislike', icon: ThumbsDown },
-  { id: 'love', icon: Heart },
-  { id: 'laugh', icon: Laugh },
-  { id: 'sad', icon: Frown },
-] as const
+const TOOL_ICONS: Record<string, any> = {
+  create_file: FilePlus2,
+  read_file: FileText,
+  list_files: FolderTree,
+  delete_file: Trash2,
+  web_search: Globe,
+  fetch_url: LinkIcon,
+}
 
-export function MessageBubble({ message, conversationId, isLast, isStreaming, onRegenerate, onEdit }: MessageBubbleProps) {
+export function MessageBubble({ message, conversationId, isLast, isStreaming, onRegenerate }: MessageBubbleProps) {
   const qc = useQueryClient()
   const [copied, setCopied] = React.useState(false)
   const [editing, setEditing] = React.useState(false)
@@ -37,10 +33,6 @@ export function MessageBubble({ message, conversationId, isLast, isStreaming, on
   const react = useMutation({
     mutationFn: async (r: string | null) =>
       (await api.post(`/chat/conversations/${conversationId}/messages/${message.id}/react`, { reaction: r ?? '' })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['conversation', conversationId] }),
-  })
-  const remove = useMutation({
-    mutationFn: async () => { await api.delete(`/chat/conversations/${conversationId}/messages/${message.id}`) },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['conversation', conversationId] }),
   })
   const saveEdit = useMutation({
@@ -60,145 +52,126 @@ export function MessageBubble({ message, conversationId, isLast, isStreaming, on
     setTimeout(() => setCopied(false), 1200)
   }
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18 }}
-      className={cn('group flex w-full gap-3 px-4 py-4', isUser ? 'justify-end' : 'justify-start')}
-    >
-      {!isUser && (
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg gradient-brand text-white shadow-sm shadow-brand-500/20 p-1.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="WormGPT" className="h-full w-full object-contain" />
-        </div>
-      )}
-      <div className={cn('flex max-w-[85%] flex-col gap-1.5', isUser && 'items-end')}>
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <span className="font-medium text-foreground">{isUser ? 'You' : 'WormGPT'}</span>
-          {message.model && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">{message.model}</span>}
-          <span>· {formatDate(message.createdAt)}</span>
-        </div>
+  const actionBtn =
+    'grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
 
-        <div
-          className={cn(
-            'rounded-2xl border px-4 py-3 text-sm shadow-sm',
-            isUser ? 'border-primary/20 bg-primary/5' : 'border-border bg-card'
-          )}
-        >
-          {Array.isArray((message.metadata as any)?.attachments) && ((message.metadata as any).attachments as any[]).length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {((message.metadata as any).attachments as any[]).map((a: any) => (
-                <a
-                  key={a.id}
-                  href={a.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block overflow-hidden rounded-md border border-border bg-background/50"
-                >
-                  {a.kind === 'image' ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={a.url} alt={a.name || 'attachment'} className="h-24 w-auto max-w-[200px] object-cover" />
-                  ) : (
-                    <div className="flex items-center gap-2 px-2 py-1 text-xs">
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="max-w-[180px] truncate">{a.name || 'file'}</span>
-                    </div>
-                  )}
-                </a>
-              ))}
-            </div>
-          )}
+  if (isUser) {
+    return (
+      <div className="group flex w-full justify-end px-4 py-1.5">
+        <div className="max-w-[85%] sm:max-w-[70%]">
           {editing ? (
-            <div className="space-y-2">
+            <div className="rounded-3xl bg-secondary px-4 py-3">
               <textarea
+                autoFocus
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
-                className="w-full min-h-[100px] resize-y rounded-md border border-input bg-background p-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full resize-none bg-transparent text-[15px] leading-relaxed outline-none"
+                rows={Math.min(10, Math.max(2, editValue.split('\n').length))}
               />
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setEditValue(message.content) }}>Cancel</Button>
-                <Button size="sm" onClick={() => saveEdit.mutate(editValue)} disabled={!editValue.trim()}>Save</Button>
+              <div className="mt-2 flex justify-end gap-2">
+                <button
+                  onClick={() => { setEditing(false); setEditValue(message.content) }}
+                  className="rounded-full bg-background px-3.5 py-1.5 text-xs font-medium hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => editValue.trim() && saveEdit.mutate(editValue.trim())}
+                  className="rounded-full bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                >
+                  Save
+                </button>
               </div>
             </div>
           ) : (
             <>
-              {isStreaming && !message.content ? (
-                <div className="flex items-center gap-1 py-1 text-muted-foreground">
-                  <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
-                </div>
-              ) : (
-                <Markdown>{message.content}</Markdown>
-              )}
+              <div className="whitespace-pre-wrap break-words rounded-3xl bg-secondary px-5 py-2.5 text-[15px] leading-relaxed">
+                {message.content}
+              </div>
+              <div className="mt-1 flex justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <button onClick={copy} className={actionBtn} aria-label="Copy">
+                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                <button onClick={() => setEditing(true)} className={actionBtn} aria-label="Edit">
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </>
           )}
         </div>
-
-        {!editing && (
-          <div className={cn('flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100', isUser && 'justify-end')}>
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={copy}>
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-            </Button>
-            {isUser ? (
-              <>
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(true)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 hover:text-destructive" onClick={() => { if (confirm('Delete message?')) remove.mutate() }}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </>
-            ) : (
-              <>
-                {onRegenerate && (
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onRegenerate}>
-                    <RotateCw className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                <DropdownReactions current={message.reaction || null} onPick={(r) => react.mutate(r === message.reaction ? null : r)} />
-                {message.metadata?.latency_ms && (
-                  <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <Info className="h-3 w-3" /> {message.metadata.latency_ms}ms
-                    {message.tokens ? ` · ${formatNumber(message.tokens)} tok` : ''}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {message.reaction && (
-          <div className="self-start text-xs text-muted-foreground">
-            Reacted: <span className="font-medium">{message.reaction}</span>
-          </div>
-        )}
       </div>
+    )
+  }
 
-      {isUser && (
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-xs font-medium text-white">
-          U
+  // Assistant message — plain, no bubble (ChatGPT style)
+  return (
+    <div className="group w-full px-4 py-1.5">
+      {isStreaming && !message.content ? (
+        <div className="py-3">
+          <div className="h-3 w-3 animate-pulse rounded-full bg-foreground" />
+        </div>
+      ) : (
+        <div className="text-[15px] leading-relaxed">
+          <Markdown>{message.content}</Markdown>
         </div>
       )}
-    </motion.div>
-  )
-}
 
-function DropdownReactions({ current, onPick }: { current: string | null; onPick: (r: string) => void }) {
-  return (
-    <div className="flex items-center rounded-md border border-transparent bg-muted/0 px-0.5 hover:bg-muted/60">
-      {REACTIONS.map((r) => (
-        <button
-          key={r.id}
-          onClick={() => onPick(r.id)}
+      {Array.isArray(message.metadata?.tools) && message.metadata.tools.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {message.metadata.tools.map((t: any, i: number) => {
+            const Icon = TOOL_ICONS[t?.name] || Wrench
+            return (
+              <span
+                key={i}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary/60 px-2.5 py-1 text-xs text-muted-foreground',
+                  t?.ok === false && 'text-destructive'
+                )}
+              >
+                <Icon className="h-3 w-3 shrink-0" />
+                <span className="font-medium">{t?.name}</span>
+                {t?.summary && <span className="max-w-64 truncate">— {t.summary}</span>}
+              </span>
+            )
+          })}
+        </div>
+      )}
+
+      {!isStreaming && message.content && (
+        <div
           className={cn(
-            'rounded p-1 text-muted-foreground hover:text-foreground',
-            current === r.id && 'text-primary'
+            'mt-1.5 flex items-center gap-0.5 transition-opacity',
+            isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           )}
-          aria-label={r.id}
         >
-          <r.icon className="h-3.5 w-3.5" />
-        </button>
-      ))}
+          <button onClick={copy} className={actionBtn} aria-label="Copy">
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            onClick={() => react.mutate(message.reaction === 'like' ? null : 'like')}
+            className={cn(actionBtn, message.reaction === 'like' && 'text-foreground')}
+            aria-label="Good response"
+          >
+            <ThumbsUp className={cn('h-3.5 w-3.5', message.reaction === 'like' && 'fill-current')} />
+          </button>
+          <button
+            onClick={() => react.mutate(message.reaction === 'dislike' ? null : 'dislike')}
+            className={cn(actionBtn, message.reaction === 'dislike' && 'text-foreground')}
+            aria-label="Bad response"
+          >
+            <ThumbsDown className={cn('h-3.5 w-3.5', message.reaction === 'dislike' && 'fill-current')} />
+          </button>
+          {onRegenerate && (
+            <button onClick={onRegenerate} className={actionBtn} aria-label="Regenerate response">
+              <RotateCw className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {message.model && (
+            <span className="ml-2 text-xs text-muted-foreground/70">{message.model}</span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
+

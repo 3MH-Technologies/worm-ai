@@ -5,7 +5,7 @@
 
 export type Role = 'user' | 'moderator' | 'developer' | 'admin' | 'superadmin'
 export type Status = 'pending' | 'approved' | 'rejected' | 'suspended'
-export type Provider = 'groq' | 'openai' | 'anthropic' | 'gemini' | 'deepseek' | 'qwen' | 'ollama' | 'custom'
+export type Provider = 'internal' | 'custom'
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool'
 export type CanvasType = 'document' | 'code' | 'markdown' | 'project' | 'research'
 export type MemoryKind = 'long_term' | 'context' | 'session' | 'preference'
@@ -48,11 +48,21 @@ export interface ModelRecord {
   hasApiKey: boolean
 }
 
+export interface AgentModelRecord {
+  id: string
+  name: string
+  description?: string | null
+  provider: string
+  enabled: boolean
+  configured: boolean
+}
+
 export interface ConversationRecord {
   id: string
   userId: string
   title: string
   modelId?: string | null
+  mode?: 'chat' | 'agent' | string
   folderId?: string | null
   favorite: boolean
   shared: boolean
@@ -258,18 +268,6 @@ export interface ErrorEvent {
   status?: number | null
   actorId?: string | null
   createdAt: string
-}
-
-export interface ProviderKeyRecord {
-  id: string
-  provider: Provider
-  endpoint?: string | null
-  status: string
-  hasApiKey: boolean
-  lastSyncAt?: string | null
-  modelsImported: number
-  createdAt: string
-  updatedAt: string
 }
 
 export interface AdminStats {

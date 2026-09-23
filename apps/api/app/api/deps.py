@@ -95,7 +95,13 @@ async def rate_limit(
         xff = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
         ident = f"ip:{xff or ip}"
     key = f"rl:{ident}"
-    ok = await allow(key, settings.rate_limit_per_min, 60)
+    try:
+        ok = await allow(key, settings.rate_limit_per_min, 60)
+    except RuntimeError:
+        # Redis isn't up (fresh deploy / missing REDIS_URL). Serving the
+        # request beats failing every call, so we fail open here.
+        log.warning("rate limiter unavailable; allowing request")
+        return
     if not ok:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "rate limit exceeded")
 

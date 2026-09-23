@@ -11,7 +11,7 @@ Role = Literal["user", "assistant", "system", "tool"]
 
 
 class MessageCreate(BaseModel):
-    content: str = Field(min_length=1, max_length=200_000)
+    content: str = Field(default="", max_length=200_000)
     role: Role = "user"
     modelId: str | None = None
     attachments: list[dict[str, Any]] | None = None
@@ -47,6 +47,7 @@ class ConversationCreate(BaseModel):
     title: str | None = None
     modelId: str | None = None
     folderId: str | None = None
+    mode: Literal["chat", "agent"] = "chat"
 
 
 class ConversationUpdate(BaseModel):
@@ -61,6 +62,7 @@ class ConversationOut(BaseModel):
     userId: str
     title: str
     modelId: str | None = None
+    mode: str = "chat"
     folderId: str | None = None
     favorite: bool = False
     shared: bool = False

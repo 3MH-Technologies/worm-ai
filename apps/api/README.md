@@ -1,6 +1,6 @@
-# WormGPT API
+# worm-ai API
 
-FastAPI service for the WormGPT platform.
+FastAPI service for the worm-ai platform. © 3MH Technologies — https://3mh.pages.dev — t.me/j49_c
 
 ## Quick start
 

@@ -51,7 +51,7 @@ export default function SearchPage() {
                   h.kind === 'conversation' ? `/c/${h.id}` :
                   h.kind === 'message' ? `/c/${h.extra.conversationId}` :
                   h.kind === 'canvas' ? `/canvas/${h.id}` :
-                  h.kind === 'model' ? '/developer' :
+                  h.kind === 'model' ? '/c' :
                   h.kind === 'user' ? `/admin/users?q=${encodeURIComponent(h.title)}` :
                   '/settings'
                 return (

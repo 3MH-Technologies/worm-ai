@@ -1,3 +1,5 @@
+# worm-ai — full local stack: Mongo + Redis + API + Web + Nginx + certbot
+# © 3MH Technologies — https://3mh.pages.dev/ — t.me/j49_c
 services:
   mongo:
     image: mongo:7

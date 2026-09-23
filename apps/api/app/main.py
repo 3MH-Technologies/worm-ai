@@ -25,11 +25,20 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await mongo.connect()
-    await redis_cache.connect()
-    await _ensure_indexes()
-    await _bootstrap_admin()
-    log.info("wormgpt.ready env=%s", settings.env)
+    # A fresh deploy (like a Hugging Face Space before its secrets are set)
+    # must not crash-loop: log what's missing and keep serving so the UI loads
+    # and /api/v1/health can report the problem.
+    try:
+        await mongo.connect()
+        await _ensure_indexes()
+        await _bootstrap_admin()
+        log.info("worm-ai ready env=%s", settings.env)
+    except Exception as e:
+        log.error("database unavailable at boot: %s — set MONGO_URI in the environment", e)
+    try:
+        await redis_cache.connect()
+    except Exception as e:
+        log.warning("cache unavailable at boot: %s — set REDIS_URL in the environment", e)
     yield
     await mongo.disconnect()
     await redis_cache.disconnect()
@@ -107,18 +116,18 @@ async def _bootstrap_admin() -> None:
         log.info("bootstrap developer updated")
         created += 1
 
-    if await mongo.system_prompts().count_documents({"name": "WormGPT Default"}) == 0:
+    if await mongo.system_prompts().count_documents({"name": "worm-ai Default"}) == 0:
         await mongo.system_prompts().insert_one({
-            "name": "WormGPT Default",
+            "name": "worm-ai Default",
             "description": "Helpful, accurate, concise assistant.",
-            "content": "You are WormGPT, a helpful, accurate, and concise AI assistant. "
+            "content": "You are worm-ai, a helpful, accurate, and concise AI assistant. "
                        "When unsure, say you don't know. Cite sources when relevant.",
             "tags": ["general"],
             "active": True,
             "currentVersion": 1,
             "versions": [{
                 "version": 1,
-                "content": "You are WormGPT, a helpful, accurate, and concise AI assistant. "
+                "content": "You are worm-ai, a helpful, accurate, and concise AI assistant. "
                            "When unsure, say you don't know. Cite sources when relevant.",
                 "changelog": "initial",
                 "createdAt": now,
@@ -134,9 +143,9 @@ async def _bootstrap_admin() -> None:
 
 
 app = FastAPI(
-    title="WormGPT API",
+    title="worm-ai API",
     version="0.1.0",
-    description="Backend for the WormGPT AI chat platform.",
+    description="Backend for the worm-ai chat platform. © 3MH Technologies — https://3mh.pages.dev",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -160,9 +169,10 @@ app.include_router(api_router)
 @app.get("/", include_in_schema=False)
 async def root() -> dict:
     return {
-        "service": "wormgpt-api",
+        "service": "worm-ai",
         "version": "0.1.0",
         "docs": "/api/docs",
+        "credits": "© 3MH Technologies — https://3mh.pages.dev — t.me/j49_c",
     }
 
 

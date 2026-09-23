@@ -159,7 +159,8 @@ async def get_stats(user=Depends(current_user)) -> AdminStats:
     ]).to_list(length=1)
     total_tokens_v = int(total_tokens[0]["sum"]) if total_tokens else 0
 
-    active_models = await mongo.models_col().count_documents({"enabled": True})
+    from app.services.notrack import NOTRACK_MODELS
+    active_models = len(NOTRACK_MODELS)
 
     # recent registrations
     recent_users = await mongo.users().find().sort("createdAt", -1).limit(8).to_list(length=8)

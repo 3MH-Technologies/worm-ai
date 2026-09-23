@@ -4,56 +4,57 @@
 
 @import 'katex/dist/katex.min.css';
 
+/* ChatGPT-exact palette */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
+    --background: 0 0% 100%;          /* #ffffff */
+    --foreground: 0 0% 5.1%;          /* #0d0d0d */
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 0 0% 5.1%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 0 72% 51%;
+    --popover-foreground: 0 0% 5.1%;
+    --primary: 0 0% 5.1%;             /* black buttons */
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 142 71% 45%;
-    --accent-foreground: 0 0% 100%;
+    --secondary: 0 0% 95.7%;          /* #f4f4f4 composer / user bubble */
+    --secondary-foreground: 0 0% 5.1%;
+    --muted: 0 0% 95.7%;
+    --muted-foreground: 0 0% 41.6%;   /* #6b6b6b */
+    --accent: 0 0% 92.5%;             /* hover surface */
+    --accent-foreground: 0 0% 5.1%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 72% 51%;
+    --border: 0 0% 89.8%;             /* #e5e5e5 */
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 5.1%;
     --radius: 0.6rem;
-    --sidebar: 0 0% 6%;
-    --sidebar-foreground: 0 0% 90%;
+    --sidebar: 0 0% 97.6%;            /* #f9f9f9 */
+    --sidebar-foreground: 0 0% 5.1%;
     --font-sans: 'Inter', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   }
 
   .dark {
-    --background: 0 0% 6%;
-    --foreground: 0 0% 93%;
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 93%;
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 93%;
-    --primary: 0 72% 51%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 14%;
-    --secondary-foreground: 0 0% 93%;
-    --muted: 0 0% 14%;
-    --muted-foreground: 0 0% 63%;
-    --accent: 142 71% 45%;
-    --accent-foreground: 0 0% 100%;
+    --background: 0 0% 12.9%;         /* #212121 */
+    --foreground: 0 0% 92.5%;         /* #ececec */
+    --card: 0 0% 18.4%;               /* #2f2f2f */
+    --card-foreground: 0 0% 92.5%;
+    --popover: 0 0% 20.8%;            /* #353535 menus */
+    --popover-foreground: 0 0% 92.5%;
+    --primary: 0 0% 98%;              /* white buttons */
+    --primary-foreground: 0 0% 5.1%;
+    --secondary: 0 0% 18.4%;          /* #2f2f2f composer / user bubble */
+    --secondary-foreground: 0 0% 92.5%;
+    --muted: 0 0% 18.4%;
+    --muted-foreground: 0 0% 70.6%;   /* #b4b4b4 */
+    --accent: 0 0% 22.7%;             /* #3a3a3a hover */
+    --accent-foreground: 0 0% 92.5%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 0 72% 51%;
-    --sidebar: 0 0% 4%;
-    --sidebar-foreground: 0 0% 90%;
+    --border: 0 0% 16%;               /* ~white/10 */
+    --input: 0 0% 16%;
+    --ring: 0 0% 83%;
+    --sidebar: 0 0% 9%;               /* #171717 */
+    --sidebar-foreground: 0 0% 92.5%;
   }
 
   * {
@@ -76,31 +77,6 @@
   .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 
-  .gradient-brand {
-    background: linear-gradient(135deg, hsl(0 72% 51%), hsl(0 84% 40%));
-    background-size: 200% 200%;
-  }
-  .gradient-evil {
-    background: linear-gradient(135deg, hsl(0 72% 51%), hsl(340 75% 45%), hsl(280 60% 50%));
-    background-size: 200% 200%;
-  }
-  .text-gradient {
-    background: linear-gradient(135deg, hsl(0 72% 60%), hsl(340 75% 55%), hsl(142 71% 55%));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .text-gradient-red {
-    background: linear-gradient(135deg, hsl(0 72% 55%), hsl(0 84% 60%));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .grid-pattern {
-    background-image: linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
-                      linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
   .glass {
     backdrop-filter: blur(20px) saturate(180%);
     background: hsl(var(--background) / 0.7);
@@ -121,16 +97,6 @@
   .dark .card-hover:hover {
     box-shadow: 0 8px 24px hsl(0 0% 0% / 0.2);
   }
-  .glow-red {
-    box-shadow: 0 0 30px hsl(0 72% 51% / 0.15), 0 0 60px hsl(0 72% 51% / 0.05);
-  }
-  .glow-green {
-    box-shadow: 0 0 20px hsl(142 71% 45% / 0.2);
-  }
-  .animate-gradient {
-    background-size: 300% 300%;
-    animation: gradient-shift 8s ease infinite;
-  }
   .typing-dot {
     @apply inline-block w-1.5 h-1.5 rounded-full bg-current mx-0.5;
     animation: pulse-dot 1.4s ease-in-out infinite both;
@@ -143,11 +109,6 @@
   @keyframes pulse-dot {
     0%, 80%, 100% { opacity: 0.3; }
     40% { opacity: 1; }
-  }
-  @keyframes gradient-shift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
   }
 }
 
@@ -162,9 +123,9 @@
 .prose-wormgpt ul { @apply list-disc pl-6 my-2 space-y-1; }
 .prose-wormgpt ol { @apply list-decimal pl-6 my-2 space-y-1; }
 .prose-wormgpt blockquote {
-  @apply border-l-4 border-primary/40 pl-4 italic text-muted-foreground my-3;
+  @apply border-l-4 border-border pl-4 italic text-muted-foreground my-3;
 }
-.prose-wormgpt a { @apply text-primary underline underline-offset-2 hover:opacity-80; }
+.prose-wormgpt a { @apply text-foreground underline underline-offset-2 hover:opacity-80; }
 .prose-wormgpt code:not(pre code) {
   @apply rounded bg-muted px-1.5 py-0.5 text-[0.85em] font-mono;
 }
@@ -177,18 +138,3 @@
 .prose-wormgpt th { @apply bg-muted/50 font-semibold; }
 .prose-wormgpt img { @apply rounded-lg my-3 max-w-full h-auto; }
 .prose-wormgpt hr { @apply my-6 border-border; }
-
-/* Evil scanline effect */
-.scanline::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    hsl(0 0% 0% / 0.03) 2px,
-    hsl(0 0% 0% / 0.03) 4px
-  );
-  pointer-events: none;
-}

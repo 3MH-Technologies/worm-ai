@@ -1,8 +1,10 @@
-# WormGPT — Architecture
+# worm-ai — Architecture
+
+> © 3MH Technologies — https://3mh.pages.dev/ — https://t.me/j49_c
 
 > **Goal:** a production-grade AI chat platform with strict admin approval,
-> encrypted provider secrets, Groq-powered streaming, research + canvas, and
-> an original premium UI.
+> internal model backends (chat + Worm Agent coding mode), research + canvas,
+> and an original premium UI.
 
 ---
 

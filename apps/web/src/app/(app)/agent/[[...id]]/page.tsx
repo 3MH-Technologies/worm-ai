@@ -8,20 +8,30 @@ import { TopBar } from '@/components/layout/topbar'
 import { Composer, ComposerAttachment } from '@/components/chat/composer'
 import { MessageBubble } from '@/components/chat/message'
 import { ConversationRecord, ConversationWithMessages, MessageRecord } from '@/lib/types'
-import { ArrowDown } from 'lucide-react'
+import { ArrowDown, Bot, AlertTriangle } from 'lucide-react'
 import { useUIStore } from '@/stores/ui'
 import { toast } from 'sonner'
 
-export default function ConversationPage() {
+interface LiveTool {
+  id: string
+  name: string
+  summary: string
+  ok: boolean
+  running: boolean
+}
+
+export default function AgentPage() {
   const params = useParams<{ id?: string }>()
   const router = useRouter()
   const id = params?.id
   const qc = useQueryClient()
-  const selectedModelId = useUIStore((s) => s.selectedModelId)
+  const selectedAgentModel = useUIStore((s) => s.selectedAgentModel)
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const abortRef = React.useRef<AbortController | null>(null)
   const [streaming, setStreaming] = React.useState(false)
   const [streamText, setStreamText] = React.useState('')
+  const [streamThinking, setStreamThinking] = React.useState('')
+  const [liveTools, setLiveTools] = React.useState<LiveTool[]>([])
   const [autoScroll, setAutoScroll] = React.useState(true)
   const [composerValue, setComposerValue] = React.useState('')
 
@@ -29,6 +39,12 @@ export default function ConversationPage() {
     queryKey: ['conversation', id],
     queryFn: async () => (await api.get<ConversationWithMessages>(`/chat/conversations/${id}`)).data,
     enabled: !!id,
+  })
+
+  const statusQ = useQuery({
+    queryKey: ['agent-status'],
+    queryFn: async () => (await api.get<{ configured: boolean }>('/agent/status')).data,
+    staleTime: 60_000,
   })
 
   const handleScroll = () => {
@@ -40,7 +56,7 @@ export default function ConversationPage() {
 
   React.useEffect(() => {
     if (autoScroll) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: streaming ? 'auto' : 'smooth' })
-  }, [convQ.data?.messages, streamText, autoScroll, streaming])
+  }, [convQ.data?.messages, streamText, liveTools, autoScroll, streaming])
 
   function readCsrfToken(): string | null {
     if (typeof document === 'undefined') return null
@@ -56,8 +72,8 @@ export default function ConversationPage() {
     if (!isRegen) {
       const userMsg: MessageRecord = {
         id: `tmp-${Date.now()}`, conversationId: id, role: 'user', content,
-        metadata: opts.attachments ? { attachments: opts.attachments } : {},
-        createdAt: new Date().toISOString(), tokens: null, model: null, reaction: null, parentId: null,
+        metadata: {}, createdAt: new Date().toISOString(),
+        tokens: null, model: null, reaction: null, parentId: null,
       }
       qc.setQueryData<ConversationWithMessages>(['conversation', id], (prev) =>
         prev ? { ...prev, messages: [...prev.messages, userMsg] } : prev
@@ -73,13 +89,15 @@ export default function ConversationPage() {
       })
     }
     setStreamText('')
+    setStreamThinking('')
+    setLiveTools([])
     setStreaming(true)
     const controller = new AbortController()
     abortRef.current = controller
     try {
       const token = getAccessToken()
       const csrf = readCsrfToken()
-      const res = await fetch(`/api/v1/chat/conversations/${id}/stream`, {
+      const res = await fetch(`/api/v1/agent/conversations/${id}/stream`, {
         method: 'POST',
         signal: controller.signal,
         headers: {
@@ -89,13 +107,19 @@ export default function ConversationPage() {
         },
         body: JSON.stringify({
           content,
-          modelId: selectedModelId || convQ.data?.modelId || null,
+          modelId: selectedAgentModel,
           role: 'user',
-          attachments: opts.attachments?.map((a) => ({ id: a.id, kind: a.kind, name: a.name, url: a.url, mimeType: a.mimeType })),
           regenerate: isRegen,
         }),
       })
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok || !res.body) {
+        let msg = `HTTP ${res.status}`
+        try {
+          const d = await res.json()
+          msg = d?.error || d?.detail || msg
+        } catch { /* ignore */ }
+        throw new Error(msg)
+      }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
@@ -121,33 +145,51 @@ export default function ConversationPage() {
             const payload = data ? JSON.parse(data) : {}
             if (event === 'delta' && payload.text) {
               setStreamText((t) => t + payload.text)
+            } else if (event === 'thinking' && payload.text) {
+              setStreamThinking((t) => t + payload.text)
+            } else if (event === 'tool') {
+              setLiveTools((prev) => [
+                ...prev,
+                { id: payload.id || String(prev.length), name: payload.name || 'tool', summary: 'running…', ok: true, running: true },
+              ])
+            } else if (event === 'tool_result') {
+              setLiveTools((prev) =>
+                prev.map((t) =>
+                  t.id === payload.id
+                    ? { ...t, summary: payload.summary || '', ok: payload.ok !== false, running: false }
+                    : t
+                )
+              )
             } else if (event === 'error') {
-              toast.error(payload.message || 'stream error')
+              toast.error(payload.message || 'agent error')
             }
           } catch { /* malformed JSON, skip */ }
         }
       }
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
-        toast.error(e?.message || 'stream failed')
+        toast.error(e?.message || 'agent stream failed')
       }
     } finally {
       abortRef.current = null
       setStreaming(false)
       setStreamText('')
+      setStreamThinking('')
+      setLiveTools([])
       qc.invalidateQueries({ queryKey: ['conversation', id] })
       qc.invalidateQueries({ queryKey: ['conversations'] })
+      qc.invalidateQueries({ queryKey: ['canvases'] })
     }
   }
 
-  // Agent conversations belong on the /agent route
+  // Chat-mode conversations belong on the /c route
   React.useEffect(() => {
-    if (id && convQ.data?.mode === 'agent') {
-      router.replace(`/agent/${id}`)
+    if (id && convQ.data?.mode && convQ.data.mode !== 'agent') {
+      router.replace(`/c/${id}`)
     }
   }, [id, convQ.data?.mode, router])
 
-  // Handle auto-starting chat via ?init= query param
+  // Handle auto-starting an agent run via ?init= query param
   React.useEffect(() => {
     if (id && typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search)
@@ -160,13 +202,16 @@ export default function ConversationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  async function startNewChat(content: string) {
+  async function startNewAgentChat(content: string) {
     try {
-      const c = (await api.post<ConversationRecord>('/chat/conversations', {})).data
+      const c = (await api.post<ConversationRecord>('/chat/conversations', {
+        mode: 'agent',
+        modelId: selectedAgentModel,
+      })).data
       qc.invalidateQueries({ queryKey: ['conversations'] })
-      router.push(`/c/${c.id}?init=${encodeURIComponent(content)}`)
+      router.push(`/agent/${c.id}?init=${encodeURIComponent(content)}`)
     } catch {
-      toast.error('Failed to start chat')
+      toast.error('Failed to start agent')
     }
   }
 
@@ -177,11 +222,17 @@ export default function ConversationPage() {
 
 
   const messages = convQ.data?.messages || []
-  const visibleMessages: MessageRecord[] = streaming
-    ? [...messages, { id: 'pending', conversationId: id || '', role: 'assistant', content: streamText, metadata: {}, createdAt: new Date().toISOString(), tokens: null, model: null, reaction: null, parentId: null } as MessageRecord]
-    : messages
+  const pendingMessage: MessageRecord | null = streaming
+    ? ({
+        id: 'pending', conversationId: id || '', role: 'assistant', content: streamText,
+        metadata: { tools: liveTools.map((t) => ({ name: t.name, summary: t.summary, ok: t.ok })) },
+        createdAt: new Date().toISOString(), tokens: null, model: null, reaction: null, parentId: null,
+      } as MessageRecord)
+    : null
+  const visibleMessages: MessageRecord[] = pendingMessage ? [...messages, pendingMessage] : messages
 
   const showEmptyState = !id || (messages.length === 0 && !streaming && !convQ.isLoading)
+  const notConfigured = statusQ.data && !statusQ.data.configured
 
   return (
     <>
@@ -189,21 +240,24 @@ export default function ConversationPage() {
       <div className="flex min-w-0 flex-1 flex-col bg-background">
         <TopBar />
 
+        {notConfigured && (
+          <div className="mx-4 mt-1 flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Worm Agent is not configured. Add <code className="rounded bg-amber-500/10 px-1.5 py-0.5 text-xs">DEEPSEEK_TOKEN=...</code> to the server .env and restart.
+          </div>
+        )}
+
         {showEmptyState ? (
-          /* Empty state — ChatGPT style: centered title + composer */
           <div className="flex flex-1 flex-col items-center justify-center px-4 pb-16">
-            <h1 className="mb-8 text-center text-3xl font-semibold tracking-tight">
-              What can I help with?
-            </h1>
-            <div className="w-full max-w-3xl">
-              <Composer
-                onSend={(msg, opts) => (id ? sendMessage(msg, opts) : startNewChat(msg))}
-                value={composerValue}
-                onChange={setComposerValue}
-              />
+            <div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground">
+              <Bot className="h-7 w-7" />
             </div>
-            <p className="mt-1 text-center text-[11px] text-muted-foreground/80">
-              Powered by internal models —{' '}
+            <h1 className="mb-1 text-center text-3xl font-semibold tracking-tight">Worm Agent</h1>
+            <p className="mb-2 text-center text-sm text-muted-foreground">
+              Your coding agent — builds files in your workspace, searches the web, and ships complete projects.
+            </p>
+            <p className="mb-8 text-center text-xs text-muted-foreground/80">
+              Powered by internal models ·{' '}
               <a href="https://3mh.pages.dev/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
                 3MH Technologies
               </a>
@@ -212,6 +266,14 @@ export default function ConversationPage() {
                 t.me/j49_c
               </a>
             </p>
+            <div className="w-full max-w-3xl">
+              <Composer
+                onSend={(msg) => (id ? sendMessage(msg) : startNewAgentChat(msg))}
+                value={composerValue}
+                onChange={setComposerValue}
+                placeholder="Ask Worm Agent to build something…"
+              />
+            </div>
           </div>
         ) : (
           <>
@@ -235,6 +297,13 @@ export default function ConversationPage() {
                       }
                     />
                   ))}
+                  {streaming && streamThinking && (
+                    <div className="px-4 py-1.5">
+                      <div className="max-h-24 overflow-hidden whitespace-pre-wrap rounded-xl bg-secondary/40 px-3 py-2 text-xs italic leading-relaxed text-muted-foreground">
+                        {streamThinking.length > 700 ? '…' + streamThinking.slice(-700) : streamThinking}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               {!autoScroll && (
@@ -255,6 +324,7 @@ export default function ConversationPage() {
                 onChange={setComposerValue}
                 streaming={streaming}
                 onStop={() => { abortRef.current?.abort() }}
+                placeholder="Ask Worm Agent…"
               />
             </div>
           </>

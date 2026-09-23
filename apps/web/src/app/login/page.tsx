@@ -37,8 +37,8 @@ export default function LoginPage() {
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
         <div className="mb-6 flex items-center justify-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="WormGPT" className="h-10 w-10 rounded-lg object-contain" />
-          <span className="text-2xl font-bold tracking-tight">Worm<span className="text-primary">GPT</span></span>
+          <img src="/logo.svg" alt="worm-ai" className="h-10 w-10 rounded-lg object-contain" />
+          <span className="text-2xl font-bold tracking-tight">worm<span className="text-primary">-ai</span></span>
         </div>
         <Card className="border-border/50 bg-card/80 backdrop-blur">
           <CardHeader className="text-center">
@@ -68,6 +68,16 @@ export default function LoginPage() {
           </CardContent>
         </Card>
       </motion.div>
+      <footer className="pb-6 text-center text-[11px] text-muted-foreground">
+        Powered by internal models ·{' '}
+        <a href="https://3mh.pages.dev/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+          3MH Technologies
+        </a>
+        {' · '}
+        <a href="https://t.me/j49_c" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+          t.me/j49_c
+        </a>
+      </footer>
     </div>
   )
 }

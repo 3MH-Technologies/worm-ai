@@ -1,3 +1,6 @@
+# worm-ai — Hugging Face Space image (Docker SDK, serves on port 7860)
+# © 3MH Technologies — https://3mh.pages.dev/ — t.me/j49_c
+FROM python:3.13-slim
 FROM python:3.13-slim
 
 RUN apt-get update && apt-get install -y curl ca-certificates && \

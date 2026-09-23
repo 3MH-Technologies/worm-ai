@@ -1,5 +1,5 @@
 ---
-title: WormGPT
+title: worm-ai
 emoji: 🧠
 colorFrom: gray
 colorTo: blue
@@ -8,16 +8,17 @@ app_port: 7860
 pinned: false
 ---
 
-# WormGPT
+# worm-ai
 
-> Production-grade AI chat platform. Streaming chat, multi-source research, collaborative canvases, full developer panel, admin approval workflow, and a polished UI.
+> Production-grade AI chat platform. Streaming chat, multi-source research, collaborative canvases, Worm Agent coding mode, admin approval workflow, and a polished ChatGPT-style UI.
 
 - **Frontend:** Next.js 15, React 19, TypeScript, TailwindCSS, ShadCN primitives, Framer Motion, Zustand, React Query.
 - **Backend:** FastAPI, Python 3.13, async-first, Pydantic v2.
 - **Storage:** MongoDB Atlas (with Realm interpreted as Atlas App Services — see *Architecture notes* below).
 - **Cache:** Redis.
-- **AI providers:** Groq (real, primary), OpenAI / Anthropic / Gemini / DeepSeek / Qwen / Ollama (stubs ready; flip a key and they go live).
+- **AI:** internal models only — chat mode (A/B/C/F) and the Worm Agent coding mode. No provider/key management.
 - **Infra:** Docker, Docker Compose, Nginx, Let's Encrypt via certbot, GitHub Actions CI.
+- **Credits:** © 3MH Technologies — https://3mh.pages.dev/ — t.me/j49_c
 
 ## Layout
 
@@ -78,7 +79,7 @@ Open http://localhost:3000. The first time, the backend creates a bootstrap supe
 
 ```bash
 npm run seed
-# seeds: demo@wormgpt.local / Demo123!  +  "WormGPT Default" system prompt
+# seeds: demo@wormgpt.local / Demo123!  +  "worm-ai Default" system prompt
 ```
 
 ## Default ports
@@ -91,12 +92,42 @@ npm run seed
 | Redis          | 6379 |
 | Nginx          | 80 / 443 |
 
-## Adding providers
+## LLM backends (no provider management)
 
-1. Sign in as admin and visit `/developer`.
-2. Click **New model** and pick a provider, enter name + API key, and save.
-3. The model appears in the top-bar selector immediately. Click **Test** to ping it.
-4. Only admins see disabled models or reveal API keys.
+There are two engines, both configured via env — no API-key UI, no provider CRUD:
+
+### 1. Chat mode (default) — internal models
+
+All chat completions flow through the internal dispatch endpoint via `apps/api/app/services/notrack.py`
+(`POST /api/dispatch` + SSE). The four internal models (A, B, C default, F) are served
+statically from `GET /api/v1/models` as **Worm Core / Worm Pro / Worm Flash / Worm Synth** —
+no vendor branding is exposed anywhere in the UI.
+
+| Env | Purpose |
+|-----|---------|
+| `NOTRACK_BASE` | Service URL (default `https://notrack.ai`) |
+| `NOTRACK_COOKIE` | Optional browser-style cookie string for higher limits |
+| `NOTRACK_MODEL` | Default model code `A`/`B`/`C`/`F` |
+| `NOTRACK_PERSONA` | `normal`, `creative`, `precise`, `concise`, `socratic`, `tutor`, `coder` |
+| `NOTRACK_MAX_TURNS` | Agent turns per dispatch (default 6) |
+
+### 2. Worm Agent mode — coding agent (internal models, by 3MH Technologies)
+
+`/agent` runs an autonomous tool loop through the internal API proxy
+(`apps/api/app/services/deepseek.py`, OpenAI-compatible `/v1/chat/completions` with tools).
+Credits: https://3mh.pages.dev/ | https://t.me/j49_c
+
+| Env | Purpose |
+|-----|---------|
+| `DEEPSEEK_PROXY_BASE` | Proxy URL (default the 3MH worker) |
+| `DEEPSEEK_TOKEN` | **Required** — DeepSeek token from chat.deepseek.com |
+| `DEEPSEEK_MODEL` | `deepseek-chat` (default) or `deepseek-reasoner` |
+| `AGENT_MAX_ITERATIONS` | Max tool-loop rounds per run (default 8) |
+
+Tools: `create_file`, `read_file`, `list_files`, `delete_file` (workspace files are stored as
+versioned canvases scoped to owner + conversation), `web_search`, `fetch_url`.
+Endpoints: `GET /api/v1/agent/models`, `GET /api/v1/agent/status`,
+`POST /api/v1/agent/conversations/{id}/stream` (SSE).
 
 ## Architecture notes
 
@@ -115,10 +146,18 @@ The spec mentions "Realm Database / Realm Sync / Realm Authentication". Realm is
 
 Chat uses Server-Sent Events. The browser's `fetch` + `ReadableStream` is used (instead of `EventSource`) so we can send the auth header in the request. The server emits `start`, `delta`, `finish`, `error`, and `done` events. The final `done` event contains the assistant message id and timing metadata.
 
-### Provider abstraction
+Worm Agent mode streams the same `start`/`delta`/`error`/`done` events plus `thinking`
+(DeepSeek reasoning), `tool` (tool started) and `tool_result` (tool finished).
 
-All chat completions go through `BaseProvider`. Implementations live in `apps/api/app/providers/`. Add a new one by subclassing `BaseProvider` and registering it in `get_provider()`.
+### LLM clients
+
+Chat completions go through `app/services/notrack.py` (chat) and agent runs through
+`app/services/deepseek.py`. There is no generic provider abstraction anymore — both
+clients are first-class and config-only, exposed to users as **internal models**.
 
 ## License
 
-Proprietary. © WormGPT.
+Proprietary. © worm-ai — a 3MH Technologies project.
+
+- https://3mh.pages.dev/
+- https://t.me/j49_c

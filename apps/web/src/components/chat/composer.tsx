@@ -1,8 +1,7 @@
 'use client'
 import * as React from 'react'
 import TextareaAutosize from 'react-textarea-autosize'
-import { ArrowUp, Square, Paperclip, Globe, FileText, Sparkles, X, File as FileIcon, Image as ImageIcon } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ArrowUp, Square, Plus, X, File as FileIcon, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api, apiError } from '@/lib/api'
 import { AttachmentRecord } from '@/lib/types'
@@ -19,24 +18,18 @@ export interface ComposerAttachment {
 
 export interface ComposerProps {
   onSend: (msg: string, opts: {
-    webSearch?: boolean
-    canvas?: boolean
     attachments?: ComposerAttachment[]
+    regenerate?: boolean
   }) => void
   onStop?: () => void
   streaming?: boolean
   placeholder?: string
-  modelMaxTokens?: number
   value?: string
   onChange?: (v: string) => void
 }
 
-const MAX_CHARS_PER_TOKEN_ESTIMATE = 4
-
-export function Composer({ onSend, onStop, streaming, placeholder, modelMaxTokens = 8192, value: externalValue, onChange }: ComposerProps) {
+export function Composer({ onSend, onStop, streaming, placeholder, value: externalValue, onChange }: ComposerProps) {
   const [value, setValue] = React.useState('')
-  const [webSearch, setWebSearch] = React.useState(false)
-  const [canvas, setCanvas] = React.useState(false)
   const [attachments, setAttachments] = React.useState<ComposerAttachment[]>([])
   const [uploading, setUploading] = React.useState(false)
   const ref = React.useRef<HTMLTextAreaElement>(null)
@@ -47,9 +40,7 @@ export function Composer({ onSend, onStop, streaming, placeholder, modelMaxToken
   React.useEffect(() => {
     if (externalValue !== undefined) {
       setValue(externalValue)
-      if (externalValue) {
-        ref.current?.focus()
-      }
+      if (externalValue) ref.current?.focus()
     }
   }, [externalValue])
 
@@ -57,10 +48,6 @@ export function Composer({ onSend, onStop, streaming, placeholder, modelMaxToken
     setValue(val)
     if (onChange) onChange(val)
   }
-
-  const estimatedTokens = Math.ceil(value.length / MAX_CHARS_PER_TOKEN_ESTIMATE)
-  const contextUsed = Math.min(100, Math.round((estimatedTokens / Math.max(modelMaxTokens, 1)) * 100))
-  const overLimit = estimatedTokens > modelMaxTokens * 0.9
 
   async function onPickFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -87,27 +74,30 @@ export function Composer({ onSend, onStop, streaming, placeholder, modelMaxToken
 
   function send() {
     const v = value.trim()
-    if (!v) return
-    onSend(v, { webSearch, canvas, attachments: attachments.length ? attachments : undefined })
+    if (!v || streaming) return
+    onSend(v, { attachments: attachments.length ? attachments : undefined })
     handleValueChange('')
     setAttachments([])
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-6">
-      <div className={cn(
-        'rounded-2xl border bg-card shadow-lg transition-all focus-within:shadow-xl',
-        overLimit ? 'border-amber-500/60' : 'border-border'
-      )}>
+    <div className="mx-auto w-full max-w-3xl px-4">
+      <div className="rounded-[28px] border border-border/50 bg-secondary shadow-[0_4px_14px_rgba(0,0,0,0.06)] dark:border-border dark:shadow-none">
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3 pt-3">
             {attachments.map((a) => (
-              <div key={a.id} className="group relative flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs">
-                {a.kind === 'image' ? <ImageIcon className="h-3.5 w-3.5 text-primary" /> : <FileIcon className="h-3.5 w-3.5 text-muted-foreground" />}
-                <span className="max-w-[160px] truncate">{a.name}</span>
+              <div
+                key={a.id}
+                className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5 text-xs"
+              >
+                {a.kind === 'image'
+                  ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  : <FileIcon className="h-3.5 w-3.5 text-muted-foreground" />}
+                <span className="max-w-40 truncate">{a.name}</span>
                 <button
                   onClick={() => setAttachments((arr) => arr.filter((x) => x.id !== a.id))}
-                  className="ml-1 rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                  className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Remove attachment"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -116,23 +106,7 @@ export function Composer({ onSend, onStop, streaming, placeholder, modelMaxToken
           </div>
         )}
 
-        <TextareaAutosize
-          ref={ref}
-          value={value}
-          onChange={(e) => handleValueChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              send()
-            }
-          }}
-          placeholder={placeholder || 'Message WormGPT… (Shift+Enter for newline)'}
-          minRows={1}
-          maxRows={12}
-          className="w-full resize-none bg-transparent px-4 pt-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
-        />
-
-        <div className="flex items-center gap-1 px-2 pb-2">
+        <div className="flex items-end gap-1 px-2 py-1.5">
           <input
             ref={fileInput}
             type="file"
@@ -140,55 +114,59 @@ export function Composer({ onSend, onStop, streaming, placeholder, modelMaxToken
             className="hidden"
             onChange={(e) => onPickFiles(e.target.files)}
           />
-          <Button
-            type="button" variant="ghost" size="sm"
+          <button
+            type="button"
             onClick={() => fileInput.current?.click()}
-            className="h-7 gap-1.5 text-xs text-muted-foreground"
             disabled={uploading}
+            className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+            aria-label="Attach files"
           >
-            <Paperclip className="h-3.5 w-3.5" /> {uploading ? 'Uploading…' : 'Attach'}
-          </Button>
-          <Button
-            type="button" variant={webSearch ? 'default' : 'ghost'} size="sm"
-            onClick={() => setWebSearch((v) => !v)}
-            className={cn('h-7 gap-1.5 text-xs', !webSearch && 'text-muted-foreground')}
-          >
-            <Globe className="h-3.5 w-3.5" /> Web
-          </Button>
-          <Button
-            type="button" variant={canvas ? 'default' : 'ghost'} size="sm"
-            onClick={() => setCanvas((v) => !v)}
-            className={cn('h-7 gap-1.5 text-xs', !canvas && 'text-muted-foreground')}
-          >
-            <FileText className="h-3.5 w-3.5" /> Canvas
-          </Button>
+            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+          </button>
 
-          {/* Token-aware status */}
-          <div className="mx-2 hidden h-1.5 w-32 overflow-hidden rounded-full bg-muted sm:block">
-            <div
-              className={cn('h-full transition-all', overLimit ? 'bg-amber-500' : contextUsed > 70 ? 'bg-amber-400' : 'bg-emerald-500')}
-              style={{ width: `${contextUsed}%` }}
-            />
-          </div>
-          <span className="hidden text-[10px] tabular-nums text-muted-foreground sm:inline">
-            ~{estimatedTokens.toLocaleString()} / {modelMaxTokens.toLocaleString()} tok
-          </span>
+          <TextareaAutosize
+            ref={ref}
+            value={value}
+            onChange={(e) => handleValueChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send()
+              }
+            }}
+            placeholder={placeholder || 'Ask anything'}
+            minRows={1}
+            maxRows={10}
+            className="max-h-64 w-full resize-none bg-transparent px-2 py-2 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground"
+          />
 
-          <span className="ml-auto" />
-          <span className="mr-2 text-[11px] text-muted-foreground">{value.length} chars</span>
           {streaming ? (
-            <Button size="icon" variant="destructive" onClick={onStop} className="h-8 w-8">
-              <Square className="h-3.5 w-3.5" />
-            </Button>
+            <button
+              onClick={onStop}
+              className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-85"
+              aria-label="Stop generating"
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </button>
           ) : (
-            <Button size="icon" variant="gradient" onClick={send} disabled={!value.trim()} className="h-8 w-8">
-              <ArrowUp className="h-4 w-4" />
-            </Button>
+            <button
+              onClick={send}
+              disabled={!value.trim()}
+              className={cn(
+                'mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full transition-all',
+                value.trim()
+                  ? 'bg-primary text-primary-foreground hover:opacity-85'
+                  : 'cursor-not-allowed bg-muted text-muted-foreground/50'
+              )}
+              aria-label="Send message"
+            >
+              <ArrowUp className="h-5 w-5" />
+            </button>
           )}
         </div>
       </div>
-      <p className="mt-2 text-center text-[11px] text-muted-foreground">
-        WormGPT can produce unfiltered output. Use responsibly.
+      <p className="py-2 text-center text-[11px] leading-4 text-muted-foreground">
+        ChatGPT can make mistakes. Check important info.
       </p>
     </div>
   )

@@ -230,36 +230,32 @@ class TestSystemPromptProtection:
 
 
 class TestModelAccess:
-    """Verify model API keys are never leaked."""
+    """The static notrack model catalogue is read-only and keyless."""
 
-    async def test_model_out_never_has_api_key(self, client, regular_user_token, admin_token):
-        # Create a model as admin
-        admin_headers = {"Authorization": f"Bearer {admin_token}"}
-        r = await client.post(
-            "/api/v1/models",
-            json={
-                "name": "test-model",
-                "provider": "groq",
-                "apiKey": "gsk_test_key_12345",
-                "enabled": True,
-            },
-            headers=admin_headers,
-        )
-        assert r.status_code == 201
-
-        # Regular user lists models
+    async def test_models_list_is_static(self, client, regular_user_token):
         headers = {"Authorization": f"Bearer {regular_user_token}"}
         r = await client.get("/api/v1/models", headers=headers)
+        assert r.status_code == 200
         data = r.json()
-        assert len(data) > 0
-        model = data[0]
-        assert "apiKey" not in model
-        assert model.get("hasApiKey") is True
+        assert len(data) == 4
+        for model in data:
+            assert model["provider"] == "internal"
+            assert "apiKey" not in model
+            assert model.get("hasApiKey") is False
 
-    async def test_developer_reveal_requires_superadmin(self, client, admin_token):
+    async def test_model_create_removed(self, client, admin_token):
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        r = await client.post(
+            "/api/v1/models",
+            json={"name": "test-model", "provider": "notrack"},
+            headers=headers,
+        )
+        assert r.status_code in (404, 405)
+
+    async def test_developer_routes_removed(self, client, admin_token):
         headers = {"Authorization": f"Bearer {admin_token}"}
         r = await client.post(
             "/api/v1/developer/models/000000000000000000000000/reveal",
             headers=headers,
         )
-        assert r.status_code == 403
+        assert r.status_code == 404

@@ -5,7 +5,11 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "wormgpt-api"}
+    return {
+        "status": "ok",
+        "service": "worm-ai",
+        "credits": "© 3MH Technologies — https://3mh.pages.dev — t.me/j49_c",
+    }
 
 
 @router.get("/health/ready")

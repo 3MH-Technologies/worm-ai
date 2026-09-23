@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # ---- Core ----
     env: Literal["development", "staging", "production"] = "development"
-    app_name: str = "WormGPT"
+    app_name: str = "worm-ai"
     app_url: str = "http://localhost:3000"
     api_url: str = "http://localhost:8000"
     log_level: str = "INFO"
@@ -41,17 +41,20 @@ class Settings(BaseSettings):
     # ---- Encryption ----
     encryption_key: str = ""
 
-    # ---- Providers ----
-    groq_api_key: str = ""
-    groq_base_url: str = "https://api.groq.com"
-    openai_api_key: str = ""
-    anthropic_api_key: str = ""
-    gemini_api_key: str = ""
-    deepseek_api_key: str = ""
-    deepseek_base_url: str = "https://api.deepseek.com/v1"
-    qwen_api_key: str = ""
-    qwen_base_url: str = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-    ollama_base_url: str = "http://localhost:11434"
+    # ---- NoTrack AI (sole LLM backend) ----
+    notrack_base: str = "https://notrack.ai"
+    # Browser-style cookie string: "k1=v1; k2=v2". Never exposed to clients.
+    notrack_cookie: str = ""
+    notrack_model: str = "C"  # A=AI-Minimax B=AI-ChatGPT C=NoTrack F=Synthesis
+    notrack_persona: str = "normal"
+    notrack_max_turns: int = 6
+
+    # ---- Worm Agent (coding agent via 3MH Technologies DeepSeek proxy) ----
+    deepseek_proxy_base: str = "https://deepseek-pow.contact-3mh.workers.dev"
+    # DeepSeek token (Bearer from chat.deepseek.com). Required for agent mode.
+    deepseek_token: str = ""
+    deepseek_model: str = "deepseek-chat"
+    agent_max_iterations: int = 8
 
     # ---- Web search ----
     web_search_provider: str = "duckduckgo"

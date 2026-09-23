@@ -4,17 +4,16 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     admin,
+    agent,
     attachments,
     auth,
     canvas,
     chat,
-    developer,
     health,
     memory,
     models,
     notifications,
     password_reset,
-    providers,
     research,
     search,
     security,
@@ -31,7 +30,7 @@ api_router.include_router(models.router)
 api_router.include_router(system_prompts.router)
 api_router.include_router(chat.router)
 api_router.include_router(summarize.router)
-api_router.include_router(developer.router)
+api_router.include_router(agent.router)
 api_router.include_router(admin.router)
 api_router.include_router(notifications.router)
 api_router.include_router(memory.router)
@@ -41,4 +40,3 @@ api_router.include_router(research.router)
 api_router.include_router(web.router)
 api_router.include_router(attachments.router)
 api_router.include_router(security.router)
-api_router.include_router(providers.router)

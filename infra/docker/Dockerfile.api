@@ -1,3 +1,5 @@
+# worm-ai — API image
+# © 3MH Technologies — https://3mh.pages.dev/ — t.me/j49_c
 FROM python:3.13-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

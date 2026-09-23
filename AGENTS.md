@@ -1,4 +1,6 @@
-# WormGPT - Agent Notes
+# worm-ai - Agent Notes
+
+© 3MH Technologies — https://3mh.pages.dev/ — https://t.me/j49_c
 
 ## Layout
 
@@ -28,9 +30,21 @@
 - Frontend: TypeScript strict, App Router, route groups in parens.
 - Backend: Python 3.13, type hints everywhere, async-first, Pydantic v2.
 - All env via `.env` (root) or service-local `.env`. Never commit secrets.
-- API keys: encrypted at rest with Fernet, never serialized to the client.
+- **Chat mode is NoTrack-only**: all chat completions flow through `app/services/notrack.py`
+  (`POST /api/dispatch` + SSE, cookie auth via `NOTRACK_COOKIE`). Model codes A/B/C/F are
+  served statically from `GET /api/v1/models`. There is no provider/key management anymore.
+- **Worm Agent mode** (`/agent`) is a coding agent on the 3MH Technologies DeepSeek proxy:
+  client in `app/services/deepseek.py` (OpenAI-compatible `/v1/chat/completions` with tools),
+  tool loop in `app/api/v1/agent.py`. Requires `DEEPSEEK_TOKEN`; model list at
+  `GET /api/v1/agent/models`, health at `GET /api/v1/agent/status`.
+- Agent workspace files are canvases with an `agentPath` field (scoped to owner +
+  conversation) and are versioned in `canvas_versions`.
+- Conversations carry `mode: "chat" | "agent"`; `/c/*` and `/agent/*` cross-redirect on mismatch.
+- **Branding rule:** user-facing copy must say **"internal models"** — never vendor names
+  (NoTrack, DeepSeek, Groq, …) and never "WormGPT". Display names: Worm Core / Worm Pro /
+  Worm Flash / Worm Synth (chat) and Worm Agent / Worm Agent R1 (agent). Site name: **worm-ai**.
+- **Credits (required):** © 3MH Technologies — https://3mh.pages.dev/ — https://t.me/j49_c
 - System prompts: never serialized to non-admin users.
-- All chat completions flow through `BaseProvider` so swapping vendors is config-only.
 
 ## Verification hooks
 

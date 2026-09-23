@@ -3,7 +3,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Users, ScrollText, AlertTriangle, Bot, FileText, ArrowLeft, Shield, Key,
+  LayoutDashboard, Users, ScrollText, AlertTriangle, FileText, ArrowLeft, Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth'
@@ -40,8 +40,6 @@ const SECTIONS: Section[] = [
   {
     label: 'Configuration',
     items: [
-      { href: '/admin/models', label: 'Models', icon: Bot },
-      { href: '/admin/providers', label: 'Providers', icon: Key },
       { href: '/admin/prompts', label: 'Prompts', icon: FileText },
     ],
   },
@@ -102,6 +100,12 @@ export function AdminSidebar() {
 
       {/* Footer */}
       <div className="border-t border-white/5 p-3">
+        <div className="mb-2 px-3 text-center text-[10px] leading-4 text-sidebar-foreground/50">
+          © 3MH Technologies —{' '}
+          <a href="https://3mh.pages.dev/" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">
+            3mh.pages.dev
+          </a>
+        </div>
         <Link
           href="/c"
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-white/5 hover:text-white"

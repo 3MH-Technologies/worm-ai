@@ -47,24 +47,24 @@ async def main() -> None:
         })
         print("seeded developer developer@teteffd.hf.space / Dev123!")
 
-    if await mongo.system_prompts().count_documents({"name": "WormGPT Default"}) == 0:
+    if await mongo.system_prompts().count_documents({"name": "worm-ai Default"}) == 0:
         await mongo.system_prompts().insert_one({
-            "name": "WormGPT Default",
+            "name": "worm-ai Default",
             "description": "Helpful, accurate, concise assistant.",
-            "content": "You are WormGPT, a helpful, accurate, and concise AI assistant. "
+            "content": "You are worm-ai, a helpful, accurate, and concise AI assistant. "
                        "When unsure, say you don't know. Cite sources when relevant.",
             "tags": ["general"],
             "active": True,
             "currentVersion": 1,
             "versions": [{
-                "version": 1, "content": "You are WormGPT, a helpful, accurate, and concise AI assistant. "
+                "version": 1, "content": "You are worm-ai, a helpful, accurate, and concise AI assistant. "
                                           "When unsure, say you don't know. Cite sources when relevant.",
                 "changelog": "initial", "createdAt": now,
             }],
             "createdAt": now,
             "updatedAt": now,
         })
-        print("seeded system prompt 'WormGPT Default'")
+        print("seeded system prompt 'worm-ai Default'")
 
     print("done")
     await mongo.disconnect()
