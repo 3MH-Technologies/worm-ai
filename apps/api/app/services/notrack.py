@@ -5,6 +5,9 @@ stream — that's what keeps the UI feeling instant.
 
 Auth is cookie-based: drop your browser cookie string into NOTRACK_COOKIE
 (format: "k1=v1; k2=v2") and the client will attach it to every request.
+
+The standalone SDK this dispatch protocol targets lives at
+https://github.com/3MH-Technologies/notrack
 """
 
 from __future__ import annotations

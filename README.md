@@ -103,6 +103,10 @@ All chat completions flow through the internal dispatch endpoint via `apps/api/a
 statically from `GET /api/v1/models` as **Worm Core / Worm Pro / Worm Flash / Worm Synth** —
 no vendor branding is exposed anywhere in the UI.
 
+> **Dependency:** the chat dispatch client is built on the open-source
+> **[NoTrack SDK](https://github.com/3MH-Technologies/notrack)** —
+> https://github.com/3MH-Technologies/notrack
+
 | Env | Purpose |
 |-----|---------|
 | `NOTRACK_BASE` | Service URL (default `https://notrack.ai`) |
