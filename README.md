@@ -1,13 +1,3 @@
----
-title: worm-ai
-emoji: 🧠
-colorFrom: gray
-colorTo: blue
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # worm-ai
 
 > Production-grade AI chat platform. Streaming chat, multi-source research, collaborative canvases, Worm Agent coding mode, admin approval workflow, and a polished ChatGPT-style UI.
