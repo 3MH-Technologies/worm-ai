@@ -1,26 +1,37 @@
 # worm-ai — Web (Next.js) image
+# Build context: repo root  →  docker build -f infra/docker/Dockerfile.web .
+# npm workspaces: root lockfile + apps/web/package.json drive `npm ci`.
 # © 3MH Technologies — https://3mh.pages.dev/ — t.me/j49_c
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci || npm install
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/
+RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+COPY --from=deps /app/package.json /app/package-lock.json ./
+COPY --from=deps /app/apps/web/package.json ./apps/web/package.json
+COPY apps/web ./apps/web
+
+# rewrites() in next.config.mjs proxies browser → API at runtime; bake the
+# build-time default so a plain `docker build` still yields a working image.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_TELEMETRIC_DISABLED=1
+RUN npm run build --workspace=apps/web
 
 FROM node:20-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production NEXT_TELEMETRIC_DISABLED=1 PORT=3000
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+COPY --from=deps /app/package.json /app/package-lock.json ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/package.json ./apps/web/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next ./apps/web/.next
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder /app/apps/web/next.config.mjs ./apps/web/next.config.mjs
 USER nextjs
 EXPOSE 3000
-ENV PORT=3000
-CMD ["npm", "run", "start"]
+CMD ["npm", "run", "start", "--workspace=apps/web"]

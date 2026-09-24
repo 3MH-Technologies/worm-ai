@@ -1,4 +1,5 @@
 # worm-ai — API image
+# Build context: repo root  →  docker build -f infra/docker/Dockerfile.api .
 # © 3MH Technologies — https://3mh.pages.dev/ — t.me/j49_c
 FROM python:3.13-slim AS base
 
@@ -13,10 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
-RUN pip install --upgrade pip && pip install . --no-deps && pip install -e .
-
-COPY app ./app
+# Dependency layer: only pyproject.toml invalidates pip installs.
+COPY apps/api/pyproject.toml ./
+COPY apps/api/app ./app
+RUN pip install --upgrade pip && pip install .
 
 ENV PYTHONPATH=/app
 EXPOSE 8000

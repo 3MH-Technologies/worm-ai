@@ -1,10 +1,18 @@
-node_modules/
-.next/
-__pycache__/
-*.py[cod]
+# worm-ai — docker build context excludes
+# © 3MH Technologies — https://3mh.pages.dev/ — t.me/j49_c
+**/node_modules/
+**/.next/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.env
+**/.env.local
+**/.env.*.local
 .env
 .env.local
 .env.*.local
 .venv/
 .git/
 .DS_Store
+*.log
