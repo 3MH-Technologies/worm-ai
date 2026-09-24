@@ -6,12 +6,9 @@
 
 - `apps/web`  - Next.js 15 + React 19 frontend
 - `apps/api`  - FastAPI backend (Python 3.13)
-- `packages/shared` - Cross-app types/utilities (TS, optional)
 - `infra/docker` - Dockerfiles, docker-compose, Nginx
-- `infra/ci` - CI templates
 - `.github/workflows` - GitHub Actions
-- `scripts` - One-off scripts (seed etc.)
-- `docs` - Architecture / runbooks
+- `docs` - Architecture + security
 
 ## Commands
 
@@ -22,7 +19,6 @@
 | Dev Web only    | `npm run dev:web`                  |
 | Typecheck       | `npm run typecheck`                |
 | Lint            | `npm run lint`                     |
-| Seed            | `npm run seed`                     |
 | Docker up       | `npm run docker:up`                |
 
 ## Conventions

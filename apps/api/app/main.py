@@ -15,7 +15,7 @@ from app.cache import redis as redis_cache
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.middleware import CSRFMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password
 from app.db import mongo
 
 configure_logging()
@@ -52,16 +52,21 @@ async def _ensure_indexes() -> None:
 
 
 async def _bootstrap_admin() -> None:
+    """Seed a fresh install only: never modify accounts that already exist.
+
+    Runs exclusively when the ``users`` collection is completely empty.
+    Existing admins keep their UI-changed passwords across restarts (the
+    old behaviour silently reset them from env on every boot), and no
+    account with hardcoded credentials is ever created — new users go
+    through registration + admin approval.
+    """
     now = datetime.now(tz=UTC)
     created = 0
 
-    admin_email = settings.bootstrap_admin_email.lower()
-    admin_username = settings.bootstrap_admin_username
-    admin = await mongo.users().find_one({"username": admin_username})
-    if not admin:
+    if await mongo.users().find_one({}, projection={"_id": 1}) is None:
         await mongo.users().insert_one({
-            "username": admin_username,
-            "email": admin_email,
+            "username": settings.bootstrap_admin_username,
+            "email": settings.bootstrap_admin_email.lower(),
             "passwordHash": hash_password(settings.bootstrap_admin_password),
             "role": "superadmin",
             "status": "approved",
@@ -72,48 +77,7 @@ async def _bootstrap_admin() -> None:
             "failedLoginAttempts": 0,
             "lockedUntil": None,
         })
-        log.info("bootstrap admin created: %s", admin_email)
-        created += 1
-    elif admin.get("email") != admin_email or not verify_password(settings.bootstrap_admin_password, admin.get("passwordHash", "")):
-        await mongo.users().update_one(
-            {"_id": admin["_id"]},
-            {"$set": {
-                "email": admin_email,
-                "passwordHash": hash_password(settings.bootstrap_admin_password),
-                "updatedAt": now,
-            }},
-        )
-        log.info("bootstrap admin updated: %s", admin_email)
-        created += 1
-
-    dev_email = "developer@teteffd.hf.space"
-    dev = await mongo.users().find_one({"username": "developer"})
-    if not dev:
-        await mongo.users().insert_one({
-            "username": "developer",
-            "email": dev_email,
-            "passwordHash": hash_password("Dev123!"),
-            "role": "developer",
-            "status": "approved",
-            "avatar": None,
-            "createdAt": now,
-            "updatedAt": now,
-            "lastLogin": None,
-            "failedLoginAttempts": 0,
-            "lockedUntil": None,
-        })
-        log.info("bootstrap developer created")
-        created += 1
-    elif dev.get("email") != dev_email or not verify_password("Dev123!", dev.get("passwordHash", "")):
-        await mongo.users().update_one(
-            {"_id": dev["_id"]},
-            {"$set": {
-                "email": dev_email,
-                "passwordHash": hash_password("Dev123!"),
-                "updatedAt": now,
-            }},
-        )
-        log.info("bootstrap developer updated")
+        log.info("bootstrap admin created: %s", settings.bootstrap_admin_email.lower())
         created += 1
 
     if await mongo.system_prompts().count_documents({"name": "worm-ai Default"}) == 0:

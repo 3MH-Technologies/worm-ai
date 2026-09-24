@@ -8,7 +8,7 @@
 | Session hijack                                | Short access TTL (30 min) + refresh rotation + device fingerprint + revoke UI    |
 | CSRF                                          | Double-submit cookie pattern; `CSRFMiddleware` blocks unsafe w/o header         |
 | XSS via rich text                             | `rehype-sanitize` on all markdown + safe Prism highlighter + KaTeX              |
-| Secret exfiltration to browser                | API responses never include `apiKey` plaintext; only `hasApiKey` flag            |
+| Secret exfiltration to browser                | No provider keys stored at all; model catalogue responses carry no secrets       |
 | System prompt leakage                         | Admin-only endpoints; `SystemPromptOut` field names strip content for non-admins|
 | SSRF via web search                           | Only outbound GET to `http(s)` URLs; HTML cleaned, no JS executed                |
 | Rate limit abuse                              | Redis fixed-window per (user\|IP) on all sensitive endpoints                    |
@@ -19,11 +19,11 @@
 | Clickjacking                                  | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`                          |
 | Open redirect                                 | Login redirects stay on same origin via Next.js route guards                    |
 | Memory poisoning                              | Memory items stored per-user; only owners can list/delete; admins audit access  |
-| Prompt injection                              | System prompt assembled server-side from admin-curated content + user memory; user message never injected into the system block; tool/function calls not yet exposed |
+| Prompt injection                              | System prompt assembled server-side from admin-curated content + user memory; user message never injected into the system block; agent tool calls are server-side only with an owner+conversation-scoped workspace |
 
 ## Encryption at rest
 
-- **API keys** stored in `models.encryptedApiKey` as Fernet tokens.
+- **No provider API keys** are stored — the model catalogue is internal and credential-less (`hasApiKey` is always `false`); the Fernet helpers in `core/crypto.py` remain available for future secrets.
 - **System prompts** stored in plaintext (they are not secrets) but **never sent** to non-admin clients.
 - **Refresh tokens** stored hashed (sha256) so DB leak does not enable session replay.
 

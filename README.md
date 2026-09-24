@@ -13,7 +13,7 @@
 - **Cache:** Redis.
 - **AI:** internal models only — chat mode (A/B/C/F) and the Worm Agent coding mode. No provider/key management.
 - **Infra:** Docker, Docker Compose, Nginx, Let's Encrypt via certbot, GitHub Actions CI.
-- **Credits:** © 3MH Technologies — https://3mh.pages.dev/ — t.me/j49_c
+- **Credits:** © 3MH Technologies — https://3mh.pages.dev/ — https://t.me/j49_c
 
 ## Layout
 
@@ -22,14 +22,9 @@
 ├── apps/
 │   ├── web/           Next.js 15 frontend
 │   └── api/           FastAPI backend (Python 3.13)
-├── packages/
-│   └── shared/        (optional) cross-app types
-├── infra/
-│   ├── docker/        Dockerfiles, docker-compose, Nginx
-│   └── ci/            CI templates
+├── infra/docker/      Dockerfiles, docker-compose, Nginx
 ├── .github/workflows  GitHub Actions
-├── scripts/           One-off scripts (seed etc.)
-└── docs/              Architecture / runbooks
+└── docs/              Architecture + security
 ```
 
 ## Quick start (local)
@@ -38,7 +33,8 @@
 
 ```bash
 cp .env.example .env
-# Edit .env: set MONGO_URI, JWT_SECRET, ENCRYPTION_KEY, GROQ_API_KEY
+# Edit .env: set MONGO_URI, JWT_SECRET, CSRF_SECRET, ENCRYPTION_KEY
+# (optional: NOTRACK_COOKIE for chat, DEEPSEEK_TOKEN for /agent)
 ```
 
 Generate secrets:
@@ -68,14 +64,7 @@ npm run dev:api
 npm run dev:web
 ```
 
-Open http://localhost:3000. The first time, the backend creates a bootstrap superadmin from `BOOTSTRAP_*` in `.env`. Sign in with it and head to the **Admin** area to approve new users.
-
-### 4. Seed sample data (optional)
-
-```bash
-npm run seed
-# seeds: demo@wormgpt.local / Demo123!  +  "worm-ai Default" system prompt
-```
+Open http://localhost:3000. The first time (empty database), the backend creates a bootstrap superadmin from `BOOTSTRAP_*` in `.env` — existing accounts are never touched on restart. Sign in with it and head to the **Admin** area to approve new users.
 
 ## Default ports
 
@@ -137,7 +126,7 @@ The spec mentions "Realm Database / Realm Sync / Realm Authentication". Realm is
 ### Security
 
 - Passwords hashed with bcrypt.
-- API keys encrypted at rest with Fernet.
+- No provider API keys stored — internal models are credential-less (`hasApiKey` is always `false`).
 - System prompts never sent to non-admin users.
 - JWT with refresh tokens, CSRF token on cookies for non-GET requests, CSP headers, rate limiting, account lockout after 8 failed logins, audit log for every privileged action, device fingerprinting.
 

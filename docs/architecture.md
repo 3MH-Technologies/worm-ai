@@ -28,10 +28,10 @@
    ┌──────────────────────────┐           ┌──────────────────────────┐
    │   FastAPI (apps/api)     │           │  Next.js server (apps/web)│
    │  Pydantic v2 · async     │           │  App Router · Route grps │
-   │  BaseProvider abstraction│           └──────────────┬───────────┘
-   │  ├─ Groq (live)          │                          │
-   │  ├─ OpenAI / Anthropic   │           (Static / RSC rendering,
-   │  └─ stubs (Gemini, …)    │            rewrites /api/v1/* to API)
+   │  Internal dispatch       │           └──────────────┬───────────┘
+   │  ├─ chat: notrack (SSE)  │                          │
+   │  └─ agent: deepseek      │           (Static / RSC rendering,
+   │     (server-side tools)  │            rewrites /api/v1/* to API)
    └────────┬─────────────────┘
             │
    ┌────────┴─────────┐    ┌─────────────────────┐
@@ -57,33 +57,34 @@
 │   │   │   ├── db/                  # Mongo + Redis connection helpers and indexes
 │   │   │   ├── cache/               # Redis-backed rate limiter and counters
 │   │   │   ├── models/              # Pydantic v2 request/response schemas
-│   │   │   ├── providers/           # BaseProvider + Groq/OpenAI/Anthropic/stubs
-│   │   │   ├── services/            # audit, summarization, memory, attachments
+│   │   │   ├── services/            # notrack, deepseek, prompt_guard, audit
 │   │   │   └── api/
 │   │   │       ├── deps.py          # current_user, role guards, rate limit
 │   │   │       ├── router.py        # v1 aggregator
-│   │   │       └── v1/              # health, auth, chat, models, prompts, admin,
-│   │   │                            # developer, notifications, memory, search,
-│   │   │                            # canvas, research, web, security
+│   │   │       └── v1/              # admin, agent, attachments, auth, canvas,
+│   │   │                            # chat, health, memory, models, notifications,
+│   │   │                            # password_reset, research, search, security,
+│   │   │                            # summarize, system_prompts, web
 │   │   ├── pyproject.toml
 │   │   └── README.md
 │   └── web/                         # Next.js 15 frontend
 │       ├── src/
-│       │   ├── app/                 # App Router with route groups
-│       │   │   ├── (auth)/          # login, register
+│       │   ├── app/                 # App Router
+│       │   │   ├── login/           # public — email + password
+│       │   │   ├── register/        # public — sign up
+│       │   │   ├── forgot/          # public — password reset
 │       │   │   ├── (app)/           # authenticated shell with sidebar + topbar
-│       │   │   │   ├── c/[...id]    # conversation
+│       │   │   │   ├── c/[[...id]]  # conversation
+│       │   │   │   ├── agent/[[...id]] # Worm Agent coding mode
 │       │   │   │   ├── canvas/      # list, new, [id] (with versions)
 │       │   │   │   ├── research/
 │       │   │   │   ├── search/
-│       │   │   │   ├── admin/       # overview, users, audit
-│       │   │   │   ├── developer/   # models, prompts
+│       │   │   │   ├── admin/       # users, prompts, audit, errors
 │       │   │   │   ├── settings/
 │       │   │   │   ├── profile/
 │       │   │   │   ├── security/    # sessions + devices, revoke
 │       │   │   │   ├── notifications/
 │       │   │   │   └── pending/     # awaiting approval
-│       │   │   ├── api/             # (none currently — Next.js rewrites proxy)
 │       │   │   ├── not-found.tsx
 │       │   │   ├── error.tsx
 │       │   │   └── loading.tsx
@@ -103,14 +104,11 @@
 │       ├── tailwind.config.ts
 │       └── postcss.config.cjs
 ├── infra/
-│   ├── docker/                      # Dockerfile.api, Dockerfile.web, docker-compose, nginx/
-│   └── ci/
+│   └── docker/                      # Dockerfile.api, Dockerfile.web, docker-compose, nginx/
 ├── .github/workflows/ci.yml
-├── scripts/seed.py
 ├── docs/
 │   ├── architecture.md              # this file
-│   ├── security.md                  # threat model + controls
-│   └── runbooks/                    # deploy, restore, scaling
+│   └── security.md                  # threat model + controls
 ├── .env.example
 ├── .gitignore
 ├── AGENTS.md
@@ -134,7 +132,7 @@
 | `conversations`     | chat thread metadata                          | `userId`, `title`, `modelId`, `folderId`, `favorite`, `shared`, `lastMessageAt`                                        |
 | `messages`          | chat turns                                    | `conversationId`, `userId`, `role`, `content`, `tokens`, `model`, `metadata`, `parentId`, `reaction`, `attachments[]`  |
 | `conversation_summaries` | rolling summaries (memory compression)    | `conversationId`, `userId`, `summary`, `uptoMessageId`, `createdAt`                                                     |
-| `models`            | AI model definitions + encrypted keys         | `name` (uniq), `provider`, `endpoint`, `encryptedApiKey`, `temperature`, `maxTokens`, `topP`, `systemPromptId`, `enabled` |
+| `models`            | legacy registry (catalogue served statically) | `name` (uniq), `provider`, `endpoint`, `temperature`, `maxTokens`, `topP`, `systemPromptId`, `enabled`     |
 | `system_prompts`    | versioned prompts (admin-only content)        | `name`, `description`, `currentVersion`, `versions[] {version, content, changelog, createdAt}`                          |
 | `folders`           | sidebar folders                               | `userId`, `name`, `color`, `icon`                                                                                      |
 | `canvases`          | document/code/research workspaces             | `ownerId`, `title`, `type`, `content`, `metadata`, `currentVersion`                                                     |
@@ -176,6 +174,7 @@
 | POST | `/auth/login` | public | Returns access + refresh; tracks device |
 | POST | `/auth/refresh` | public | Rotates access token |
 | POST | `/auth/logout` | user | Revokes supplied refresh token |
+| POST | `/auth/logout-all` | user | Revokes all refresh tokens for the user |
 | GET  | `/auth/me` | user | Current public user |
 | PATCH| `/auth/me` | user | Update username/avatar |
 | POST | `/auth/change-password` | user | With old password |
@@ -185,12 +184,8 @@
 ### Models
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET  | `/models` | user (enabled only) / admin (all) | List |
-| GET  | `/models/{id}` | user | Get |
-| POST | `/models` | admin | Create |
-| PATCH| `/models/{id}` | admin | Update |
-| DELETE| `/models/{id}` | admin | Delete |
-| POST | `/models/{id}/test` | admin | Ping the model |
+| GET  | `/models` | user | List the four internal models (static catalogue) |
+| GET  | `/models/{id}` | user | Get one (`A`/`B`/`C`/`F`) |
 
 ### System prompts
 | Method | Path | Auth | Description |
@@ -270,18 +265,22 @@
 |---|---|---|---|
 | GET  | `/security/sessions` | user | List active sessions/devices |
 | POST | `/security/sessions/{id}/revoke` | user | Revoke a session/device |
+| POST | `/security/sessions/revoke-others` | user | Revoke every other session |
+| POST | `/security/sessions/cleanup` | user | Purge expired/revoked rows |
 
 ### Attachments
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/attachments` | user | Multipart upload (≤ 20 MB) |
 | GET  | `/attachments/{id}` | user | Stream (auth-checked) |
+| DELETE| `/attachments/{id}` | user | Delete own attachment |
 
-### Developer
+### Worm Agent
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET  | `/developer/models` | admin | All models |
-| POST | `/developer/models/{id}/reveal` | **superadmin** | Decrypt & return key (audited) |
+| GET  | `/agent/models` | user | List agent model aliases |
+| GET  | `/agent/status` | user | Proxy health + token presence |
+| POST | `/agent/conversations/{cid}/stream` | user | **SSE** agent tool loop (files, web_search, fetch_url) |
 
 ### Admin
 | Method | Path | Auth | Description |
@@ -310,9 +309,11 @@
 | `/`                      | public               | Landing (CTA, features) → redirects to `/c` when authenticated                            |
 | `/login`                 | public               | Email + password sign-in                                                                 |
 | `/register`              | public               | Sign up; on success → "pending approval" card                                            |
+| `/forgot`                | public               | Password reset request                                                                    |
 | `/pending`               | auth-gated           | Shown when `user.status != approved`; CTA to re-check or sign out                        |
 | `/c`                     | app shell            | Empty chat with composer; "How can I help today?"                                         |
 | `/c/[...id]`             | app shell            | Conversation view with sidebar, top bar, streaming messages                              |
+| `/agent`                 | app shell            | Worm Agent coding mode — workspace files + tool events (`/agent/[...id]` reopens one)     |
 | `/canvas`                | app shell            | List of user's canvases                                                                  |
 | `/canvas/new`            | app shell            | Type picker + title                                                                      |
 | `/canvas/[id]`           | app shell            | Edit / split / preview; version history sidebar; restore; diff; autosave                 |
@@ -326,13 +327,12 @@
 | `/admin/users`           | app shell (admin)    | User table, role/status actions                                                          |
 | `/admin/audit`           | app shell (admin)    | Audit log feed                                                                           |
 | `/admin/errors`          | app shell (admin)    | Recent server errors                                                                     |
-| `/developer`             | app shell (admin)    | Model CRUD + test button                                                                 |
-| `/developer/prompts`     | app shell (admin)    | System prompt manager with versioning                                                     |
+| `/admin/prompts`         | app shell (admin)    | System prompt manager with versioning                                                     |
 | `/_not-found`            | global               | Custom 404                                                                               |
 | `/loading` / `error`     | global               | Suspense + error boundaries                                                              |
 
 ### Cross-cutting UI
-- **Sidebar** (`components/layout/sidebar.tsx`): new chat, debounced search, favorites/shared/all tabs, folder tree, admin/developer entries (gated).
+- **Sidebar** (`components/layout/sidebar.tsx`): new chat, debounced search, favorites/shared/all tabs, folder tree, agent mode entry, admin entries (gated).
 - **Top bar** (`components/layout/topbar.tsx`): model selector, workspace selector, notifications popover, theme switcher, profile menu.
 - **Chat composer** (`components/chat/composer.tsx`): textarea with auto-grow, Web/Canvas toggles, token-aware status, file picker, send/stop, regenerate shortcut.
 - **Message bubble** (`components/chat/message.tsx`): copy, edit, delete, regenerate, reaction bar, latency/tokens metadata.
@@ -346,7 +346,7 @@
 
 ```
 event: start
-data: {"userMessageId":"...","model":"llama-3.3-70b-versatile","provider":"groq"}
+data: {"userMessageId":"...","model":"Worm Core","provider":"internal"}
 
 event: delta
 data: {"text":"Hello"}
@@ -371,7 +371,7 @@ header is sent. Errors emit a single `event: error` and the connection closes.
 See `docs/security.md` for the full threat model. Highlights:
 
 - Bcrypt password hashing.
-- Fernet encryption for API keys at rest. Plaintext only in superadmin reveal.
+- No provider API keys stored (internal, credential-less models); Fernet helpers remain in `core/crypto.py` for future secrets.
 - JWT access (15-30 min) + refresh (14 d) with rotation + revocation table.
 - CSRF double-submit on unsafe methods.
 - CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy.
@@ -388,7 +388,7 @@ See `docs/security.md` for the full threat model. Highlights:
 ## 8. Performance budget
 
 - First contentful paint < 1.5 s on a warm cache; full chat shell < 2 s.
-- First-token latency (Groq) median < 300 ms; p95 < 700 ms.
+- First-token latency (internal dispatch) median < 300 ms; p95 < 700 ms.
 - All chat reads paginate; history capped at 400 messages before summarization is triggered.
 - MongoDB indexes cover all hot read paths; full-text search uses Mongo's `$text`.
 - Redis-backed sliding window for rate limit + daily token counters.

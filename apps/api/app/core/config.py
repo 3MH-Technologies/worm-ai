@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     notrack_base: str = "https://notrack.ai"
     # Browser-style cookie string: "k1=v1; k2=v2". Never exposed to clients.
     notrack_cookie: str = ""
-    notrack_model: str = "C"  # A=AI-Minimax B=AI-ChatGPT C=NoTrack F=Synthesis
+    notrack_model: str = "C"  # A=Worm Flash B=Worm Pro C=Worm Core F=Worm Synth
     notrack_persona: str = "normal"
     notrack_max_turns: int = 6
 
@@ -67,7 +67,8 @@ class Settings(BaseSettings):
     max_context_tokens: int = 32_000
 
     # ---- Bootstrap admin ----
-    bootstrap_admin_email: str = "admin@falaki-ai.pages.dev"
+    # Created only when the users collection is completely empty (fresh install).
+    bootstrap_admin_email: str = "admin@example.com"
     bootstrap_admin_password: str = "Admin123!"
     bootstrap_admin_username: str = "admin"
 

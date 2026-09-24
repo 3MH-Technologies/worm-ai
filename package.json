@@ -15,7 +15,6 @@
     "lint": "cd apps/web && npm run lint",
     "typecheck": "tsc -p apps/web/tsconfig.json --noEmit",
     "format": "prettier --write \"apps/**/*.{ts,tsx,js,json,md}\"",
-    "seed": "cd apps/api && python -m scripts.seed",
     "docker:up": "cd infra/docker && docker compose up -d",
     "docker:down": "cd infra/docker && docker compose down",
     "docker:logs": "cd infra/docker && docker compose logs -f"
