@@ -1,5 +1,10 @@
 # worm-ai
 
+[![CI](https://github.com/3MH-Technologies/worm-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/3MH-Technologies/worm-ai/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-proprietary-lightgrey.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.13-blue.svg?logo=python&logoColor=white)](apps/api)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black.svg?logo=nextdotjs)](apps/web)
+
 > Production-grade AI chat platform. Streaming chat, multi-source research, collaborative canvases, Worm Agent coding mode, admin approval workflow, and a polished ChatGPT-style UI.
 
 - **Frontend:** Next.js 15, React 19, TypeScript, TailwindCSS, ShadCN primitives, Framer Motion, Zustand, React Query.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,13 +46,13 @@ async def lifespan(app: FastAPI):
 
 async def _ensure_indexes() -> None:
     """Safety net: ensure indexes exist even if mongo.connect skipped them."""
-    from app.db.mongo import _ensure_indexes as _db_ensure
     from app.db import mongo
+    from app.db.mongo import _ensure_indexes as _db_ensure
     await _db_ensure(mongo.db())
 
 
 async def _bootstrap_admin() -> None:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     created = 0
 
     admin_email = settings.bootstrap_admin_email.lower()
@@ -182,8 +182,9 @@ async def unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
     log.exception("unhandled rid=%s err=%s", rid, exc)
     # best-effort persistence so admins can see the most recent server errors
     try:
+        from datetime import datetime
+
         from app.db import mongo as _mongo
-        from datetime import datetime, timezone
         await _mongo.errors_log().insert_one({
             "kind": "server",
             "message": f"{type(exc).__name__}: {exc}"[:1000],
@@ -193,7 +194,7 @@ async def unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
             "actorId": None,
             "requestId": rid,
             "userAgent": request.headers.get("user-agent"),
-            "createdAt": datetime.now(tz=timezone.utc),
+            "createdAt": datetime.now(tz=UTC),
         })
     except Exception:
         pass

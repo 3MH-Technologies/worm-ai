@@ -14,8 +14,8 @@ async def health() -> dict:
 
 @router.get("/health/ready")
 async def ready() -> dict:
-    from app.db import mongo
     from app.cache import redis as redis_cache
+    from app.db import mongo
     info: dict = {"mongo": "unknown", "redis": "unknown"}
     try:
         await mongo.db().command("ping")

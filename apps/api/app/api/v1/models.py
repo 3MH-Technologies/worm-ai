@@ -7,7 +7,7 @@ app.services.notrack, so branding stays in one place.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -17,7 +17,7 @@ from app.services.notrack import NOTRACK_MODEL_DESCRIPTIONS, NOTRACK_MODELS
 
 router = APIRouter(prefix="/models", tags=["models"])
 
-_EPOCH = datetime(2024, 1, 1, tzinfo=timezone.utc)
+_EPOCH = datetime(2024, 1, 1, tzinfo=UTC)
 
 
 def _to_out(code: str) -> ModelOut:

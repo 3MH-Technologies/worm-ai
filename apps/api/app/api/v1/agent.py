@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bson import ObjectId
@@ -151,7 +151,7 @@ async def _tool_create_file(user: dict, conv_id: ObjectId, args: dict) -> tuple[
         raise ValueError("path is required")
     if len(content) > _MAX_FILE_CHARS:
         raise ValueError(f"content too large (max {_MAX_FILE_CHARS} chars)")
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     col = mongo.canvases()
     ctype = _file_type(path, language)
     existing = await col.find_one({"ownerId": user["_id"], "conversationId": conv_id, "agentPath": path})
@@ -352,7 +352,7 @@ async def agent_stream(
 
     regenerate = bool(payload.regenerate)
     content = (payload.content or "").strip()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
 
     if regenerate:
         last_user = await mongo.messages().find_one(
@@ -485,7 +485,7 @@ async def agent_stream(
             yield {"event": "error", "data": json.dumps({"message": str(e)})}
         finally:
             full = "".join(buffer).strip()
-            now2 = datetime.now(tz=timezone.utc)
+            now2 = datetime.now(tz=UTC)
             assistant_doc = {
                 "conversationId": conv["_id"],
                 "userId": user["_id"],

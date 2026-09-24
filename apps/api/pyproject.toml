@@ -39,7 +39,32 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "ASYNC", "SIM", "PL"]
-ignore = ["PLR0913", "PLR2004", "E501"]
+# PLC0415: lazy in-function imports are intentional (defer heavy/optional deps).
+# PLW0603: module-level singletons (mongo/redis/fernet clients) are the pattern here.
+ignore = ["PLR0913", "PLR2004", "E501", "PLC0415", "PLW0603"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom: `x = Depends(...)`, `f = File(...)` in signatures.
+extend-immutable-calls = [
+  "fastapi.Depends",
+  "fastapi.File",
+  "fastapi.Form",
+  "fastapi.UploadFile",
+  "fastapi.Query",
+  "fastapi.Path",
+  "fastapi.Header",
+  "fastapi.Cookie",
+  "fastapi.Body",
+]
+
+# Long streaming/agent handlers kept as-is (statement/branch limits per file).
+[tool.ruff.lint.per-file-ignores]
+"app/api/v1/admin.py" = ["PLR0917"]
+"app/api/v1/agent.py" = ["PLR0911", "PLR0912", "PLR0915"]
+"app/api/v1/chat.py" = ["PLR0912", "PLR0915", "PLR0917"]
+"app/api/v1/search.py" = ["PLR0912"]
+"app/services/deepseek.py" = ["PLR0912", "PLR0915"]
+"app/services/notrack.py" = ["PLR0912", "PLR0915"]
 
 [tool.mypy]
 python_version = "3.13"

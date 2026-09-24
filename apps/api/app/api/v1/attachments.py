@@ -7,18 +7,16 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.api.deps import current_user
-from app.core.config import get_settings
 from app.db import mongo
 from app.services.audit import log_action
 
@@ -129,7 +127,7 @@ async def upload(user=Depends(current_user), file: UploadFile = File(...)) -> At
     full_path.parent.mkdir(parents=True, exist_ok=True)
     if not full_path.exists():
         full_path.write_bytes(blob)
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     doc = {
         "userId": user["_id"],
         "kind": _detect_kind(mime_type),

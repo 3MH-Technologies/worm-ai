@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -63,7 +63,7 @@ async def admin_update_user(user_id: str, payload: AdminUserUpdateIn, user=Depen
         raise HTTPException(status.HTTP_403_FORBIDDEN, "only superadmin can grant admin")
     if updates.get("role") == "developer" and user.get("role") not in ("admin", "superadmin"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin only can grant developer")
-    updates["updatedAt"] = datetime.now(tz=timezone.utc)
+    updates["updatedAt"] = datetime.now(tz=UTC)
     res = await mongo.users().update_one({"_id": ObjectId(user_id)}, {"$set": updates})
     if res.matched_count == 0:
         raise HTTPException(404, "user not found")
@@ -78,7 +78,7 @@ async def admin_update_user(user_id: str, payload: AdminUserUpdateIn, user=Depen
             "body": f"Your account status is now '{updates['status']}'.",
             "kind": "success" if updates["status"] == "approved" else "warning",
             "read": False,
-            "createdAt": datetime.now(tz=timezone.utc),
+            "createdAt": datetime.now(tz=UTC),
         })
 
     return public_user(target)
@@ -89,7 +89,7 @@ async def approve_user(user_id: str, user=Depends(current_user)) -> dict:
     _admin(user)
     res = await mongo.users().update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {"status": "approved", "updatedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"status": "approved", "updatedAt": datetime.now(tz=UTC)}},
     )
     if res.matched_count == 0:
         raise HTTPException(404, "user not found")
@@ -101,7 +101,7 @@ async def approve_user(user_id: str, user=Depends(current_user)) -> dict:
         "body": "Your account has been approved. You can now start chatting.",
         "kind": "success",
         "read": False,
-        "createdAt": datetime.now(tz=timezone.utc),
+        "createdAt": datetime.now(tz=UTC),
     })
     return public_user(target)
 
@@ -111,7 +111,7 @@ async def reject_user(user_id: str, user=Depends(current_user)) -> dict:
     _admin(user)
     res = await mongo.users().update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {"status": "rejected", "updatedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"status": "rejected", "updatedAt": datetime.now(tz=UTC)}},
     )
     if res.matched_count == 0:
         raise HTTPException(404, "user not found")
@@ -134,7 +134,7 @@ async def delete_user(user_id: str, user=Depends(current_user)) -> None:
 @router.get("/stats", response_model=AdminStats)
 async def get_stats(user=Depends(current_user)) -> AdminStats:
     _admin(user)
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday = now - timedelta(days=1)
 

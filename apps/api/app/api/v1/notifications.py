@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,7 +31,7 @@ async def list_notifications(user=Depends(current_user)) -> list[NotificationOut
 async def mark_read(nid: str, user=Depends(current_user)) -> NotificationOut:
     res = await mongo.notifications().find_one_and_update(
         {"_id": ObjectId(nid), "userId": user["_id"]},
-        {"$set": {"read": True, "readAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"read": True, "readAt": datetime.now(tz=UTC)}},
         return_document=True,
     )
     if not res:
@@ -46,7 +46,7 @@ async def mark_read(nid: str, user=Depends(current_user)) -> NotificationOut:
 async def mark_all_read(user=Depends(current_user)) -> dict:
     res = await mongo.notifications().update_many(
         {"userId": user["_id"], "read": False},
-        {"$set": {"read": True, "readAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"read": True, "readAt": datetime.now(tz=UTC)}},
     )
     return {"updated": res.modified_count}
 

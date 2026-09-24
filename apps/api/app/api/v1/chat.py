@@ -6,11 +6,11 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bson import ObjectId
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import current_user, enforce_approval, rate_limit
@@ -29,7 +29,6 @@ from app.models.chat import (
     MessageReaction,
 )
 from app.services import notrack
-from app.services.audit import log_action
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -87,7 +86,7 @@ async def create_folder(payload: FolderCreate, user=Depends(current_user)) -> Fo
         "name": payload.name,
         "color": payload.color,
         "icon": payload.icon,
-        "createdAt": datetime.now(tz=timezone.utc),
+        "createdAt": datetime.now(tz=UTC),
     }
     res = await mongo.folders().insert_one(doc)
     doc["_id"] = res.inserted_id
@@ -116,8 +115,8 @@ def _conv_out(doc: dict, msg_count: int = 0) -> ConversationOut:
         shared=doc.get("shared", False),
         messageCount=msg_count,
         lastMessageAt=doc.get("lastMessageAt"),
-        createdAt=doc.get("createdAt") or datetime.now(tz=timezone.utc),
-        updatedAt=doc.get("updatedAt") or datetime.now(tz=timezone.utc),
+        createdAt=doc.get("createdAt") or datetime.now(tz=UTC),
+        updatedAt=doc.get("updatedAt") or datetime.now(tz=UTC),
     )
 
 
@@ -148,7 +147,7 @@ async def list_conversations(
 @router.post("/conversations", response_model=ConversationOut, status_code=201)
 async def create_conversation(payload: ConversationCreate, user=Depends(current_user)) -> ConversationOut:
     await enforce_approval(user)
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     model_id = (payload.modelId or "").strip()
     if len(model_id) == 1:
         model_id = model_id.upper()  # notrack single-letter codes
@@ -203,7 +202,7 @@ async def update_conversation(cid: str, payload: ConversationUpdate, user=Depend
         if not conv:
             raise HTTPException(404, "not found")
         return _conv_out(conv)
-    updates["updatedAt"] = datetime.now(tz=timezone.utc)
+    updates["updatedAt"] = datetime.now(tz=UTC)
     res = await mongo.conversations().update_one(
         {"_id": ObjectId(cid), "userId": user["_id"]},
         {"$set": updates},
@@ -234,7 +233,7 @@ async def post_message(cid: str, payload: MessageCreate, user=Depends(current_us
     if not conv:
         raise HTTPException(404, "conversation not found")
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     doc = {
         "conversationId": conv["_id"],
         "userId": user["_id"],
@@ -269,7 +268,7 @@ async def post_message(cid: str, payload: MessageCreate, user=Depends(current_us
 async def edit_message(cid: str, mid: str, payload: MessageEdit, user=Depends(current_user)) -> MessageOut:
     res = await mongo.messages().find_one_and_update(
         {"_id": ObjectId(mid), "conversationId": ObjectId(cid), "userId": user["_id"]},
-        {"$set": {"content": payload.content, "editedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"content": payload.content, "editedAt": datetime.now(tz=UTC)}},
         return_document=True,
     )
     if not res:
@@ -344,7 +343,7 @@ async def stream_message(
     if not regenerate and not content:
         raise HTTPException(400, "message content is required")
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     user_msg_id: ObjectId | None = None
     if not regenerate:
         # Persist user message
@@ -445,7 +444,7 @@ async def stream_message(
             yield {"event": "error", "data": json.dumps({"message": str(e)})}
         finally:
             full = "".join(buffer)
-            now2 = datetime.now(tz=timezone.utc)
+            now2 = datetime.now(tz=UTC)
             # Save assistant message
             assistant_doc = {
                 "conversationId": conv["_id"],
@@ -507,8 +506,9 @@ async def stream_message(
 
 
 async def _track_usage(user_id: ObjectId, tokens: int, provider: str) -> None:
-    from app.cache.redis import client as redis_client
     from datetime import datetime
+
+    from app.cache.redis import client as redis_client
     today = datetime.utcnow().strftime("%Y-%m-%d")
     key = f"usage:{today}:{provider}"
     try:

@@ -5,9 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
 
@@ -46,7 +45,7 @@ async def forgot_password(payload: ForgotIn, request: Request) -> dict:
     response: dict = {"ok": True}
     if user:
         token = secrets.token_urlsafe(32)
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         await mongo.password_resets().insert_one({
             "userId": user["_id"],
             "tokenHash": _hash(token),
@@ -72,7 +71,7 @@ async def reset_password(payload: ResetIn, request: Request) -> None:
     record = await mongo.password_resets().find_one({"tokenHash": token_hash, "usedAt": None})
     if not record:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid or used token")
-    if record["expiresAt"] < datetime.now(tz=timezone.utc):
+    if record["expiresAt"] < datetime.now(tz=UTC):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "token expired")
 
     user = await mongo.users().find_one({"_id": record["userId"]})
@@ -81,16 +80,16 @@ async def reset_password(payload: ResetIn, request: Request) -> None:
 
     await mongo.users().update_one(
         {"_id": user["_id"]},
-        {"$set": {"passwordHash": hash_password(payload.newPassword), "updatedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"passwordHash": hash_password(payload.newPassword), "updatedAt": datetime.now(tz=UTC)}},
     )
     await mongo.password_resets().update_one(
         {"_id": record["_id"]},
-        {"$set": {"usedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"usedAt": datetime.now(tz=UTC)}},
     )
     # revoke all refresh tokens for safety
     await mongo.refresh_tokens().update_many(
         {"userId": user["_id"], "revoked": False},
-        {"$set": {"revoked": True, "revokedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"revoked": True, "revokedAt": datetime.now(tz=UTC)}},
     )
     await log_action(
         actor_id=str(user["_id"]),
@@ -104,5 +103,5 @@ async def reset_password(payload: ResetIn, request: Request) -> None:
         "body": "If this was not you, please contact an administrator immediately.",
         "kind": "warning",
         "read": False,
-        "createdAt": datetime.now(tz=timezone.utc),
+        "createdAt": datetime.now(tz=UTC),
     })

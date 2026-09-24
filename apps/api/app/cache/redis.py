@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import redis.asyncio as redis
 
@@ -11,7 +10,7 @@ from app.core.config import get_settings
 
 log = logging.getLogger(__name__)
 
-_client: Optional[redis.Redis] = None
+_client: redis.Redis | None = None
 
 
 async def connect() -> redis.Redis:

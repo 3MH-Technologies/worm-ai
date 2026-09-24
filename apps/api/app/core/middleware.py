@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-import secrets
 import time
 import uuid
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -78,10 +77,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if request.method not in self.SAFE:
             cookie = request.cookies.get(self.cookie_name)
             header = request.headers.get(self.header_name)
-            if cookie and header:
-                if cookie != header:
-                    from fastapi import HTTPException
-                    raise HTTPException(403, "CSRF token mismatch")
+            if cookie and header and cookie != header:
+                from fastapi import HTTPException
+
+                raise HTTPException(403, "CSRF token mismatch")
 
         response = await call_next(request)
 

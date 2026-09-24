@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 
-from bson import ObjectId
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import current_user

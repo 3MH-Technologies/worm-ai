@@ -92,11 +92,13 @@ class TestJWT:
         assert header["alg"] == "HS256"
 
     def test_expired_token_raises(self):
-        from app.core.security import decode_token
+        from app.core.config import get_settings
+
+        s = get_settings()
         expired = jwt.encode(
             {"sub": "x", "exp": 0, "iat": 0, "type": "access", "jti": "test"},
-            "secret",
-            algorithm="HS256",
+            s.jwt_secret,
+            algorithm=s.jwt_algorithm,
         )
         # Manually decode to test expiry
         with pytest.raises(jwt.ExpiredSignatureError):

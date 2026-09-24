@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import difflib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import current_user
 from app.db import mongo
@@ -25,8 +25,8 @@ def _to_out(doc: dict) -> CanvasOut:
         metadata=doc.get("metadata") or {},
         conversationId=str(doc["conversationId"]) if doc.get("conversationId") else None,
         currentVersion=doc.get("currentVersion", 1),
-        createdAt=doc.get("createdAt") or datetime.now(tz=timezone.utc),
-        updatedAt=doc.get("updatedAt") or datetime.now(tz=timezone.utc),
+        createdAt=doc.get("createdAt") or datetime.now(tz=UTC),
+        updatedAt=doc.get("updatedAt") or datetime.now(tz=UTC),
     )
 
 
@@ -45,7 +45,7 @@ async def list_canvas(
 
 @router.post("", response_model=CanvasOut, status_code=201)
 async def create_canvas(payload: CanvasCreate, user=Depends(current_user)) -> CanvasOut:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     doc = {
         "ownerId": user["_id"],
         "title": payload.title,
@@ -95,10 +95,10 @@ async def update_canvas(canvas_id: str, payload: CanvasUpdate, user=Depends(curr
             "content": updates["content"],
             "commitMessage": commit_message,
             "authorId": user["_id"],
-            "createdAt": datetime.now(tz=timezone.utc),
+            "createdAt": datetime.now(tz=UTC),
         })
         updates["currentVersion"] = next_v
-    updates["updatedAt"] = datetime.now(tz=timezone.utc)
+    updates["updatedAt"] = datetime.now(tz=UTC)
     await mongo.canvases().update_one({"_id": canvas["_id"]}, {"$set": updates})
     return _to_out(await mongo.canvases().find_one({"_id": canvas["_id"]}))
 
@@ -138,11 +138,11 @@ async def restore_version(canvas_id: str, version: int, user=Depends(current_use
         "content": v["content"],
         "commitMessage": f"restore from v{version}",
         "authorId": user["_id"],
-        "createdAt": datetime.now(tz=timezone.utc),
+        "createdAt": datetime.now(tz=UTC),
     })
     await mongo.canvases().update_one(
         {"_id": canvas["_id"]},
-        {"$set": {"content": v["content"], "currentVersion": next_v, "updatedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"content": v["content"], "currentVersion": next_v, "updatedAt": datetime.now(tz=UTC)}},
     )
     return _to_out(await mongo.canvases().find_one({"_id": canvas["_id"]}))
 

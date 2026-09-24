@@ -7,8 +7,7 @@ import asyncio
 import logging
 import re
 import time
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
@@ -147,4 +146,4 @@ async def fetch_url(url: str, user=Depends(current_user)) -> dict:
     """Fetch a URL and return sanitised text content."""
     await enforce_approval(user)
     text = await _fetch_content(url)
-    return {"url": url, "content": text, "fetchedAt": datetime.now(tz=timezone.utc)}
+    return {"url": url, "content": text, "fetchedAt": datetime.now(tz=UTC)}

@@ -78,9 +78,9 @@ class NotrackClient:
                     follow_redirects=True,
                 )
                 for pair in (settings.notrack_cookie or "").split(";"):
-                    pair = pair.strip()
-                    if "=" in pair:
-                        k, v = pair.split("=", 1)
+                    stripped = pair.strip()
+                    if "=" in stripped:
+                        k, v = stripped.split("=", 1)
                         client.cookies.set(k.strip(), v.strip())
                 self._client = client
             return self._client

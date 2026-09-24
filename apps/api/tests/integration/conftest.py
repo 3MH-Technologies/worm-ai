@@ -14,9 +14,6 @@ from app.core.security import create_access_token, hash_password
 from app.db import mongo
 
 
-pytest_plugins = ("pytest_asyncio",)
-
-
 def pytest_configure(config):
     os.environ.setdefault("APP_ENV", "test")
     os.environ.setdefault("MONGO_DB", "wormgpt_test")

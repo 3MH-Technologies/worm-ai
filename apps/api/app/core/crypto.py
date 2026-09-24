@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import base64
 import logging
-from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 
 from app.core.config import get_settings
 
 log = logging.getLogger(__name__)
-_fernet: Optional[Fernet] = None
+_fernet: Fernet | None = None
 
 
 def _derive_key(secret: str) -> bytes:

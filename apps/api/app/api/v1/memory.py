@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,7 +22,7 @@ def _to_out(doc: dict) -> MemoryItem:
         content=doc.get("content", ""),
         weight=doc.get("weight", 1.0),
         source=doc.get("source"),
-        createdAt=doc.get("createdAt") or datetime.now(tz=timezone.utc),
+        createdAt=doc.get("createdAt") or datetime.now(tz=UTC),
         lastUsedAt=doc.get("lastUsedAt"),
     )
 
@@ -43,7 +42,7 @@ async def add_memory(payload: MemoryCreate, user=Depends(current_user)) -> Memor
         "content": payload.content,
         "weight": payload.weight,
         "source": payload.source,
-        "createdAt": datetime.now(tz=timezone.utc),
+        "createdAt": datetime.now(tz=UTC),
         "lastUsedAt": None,
     }
     res = await mongo.memories().insert_one(doc)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from bson import ObjectId
@@ -80,7 +80,7 @@ async def revoke_session(session_id: str, user=Depends(current_user), request: R
     # Try device first
     res = await mongo.devices().update_one(
         {"_id": oid, "userId": user["_id"]},
-        {"$set": {"revokedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"revokedAt": datetime.now(tz=UTC)}},
     )
     if res.matched_count:
         # also revoke any refresh tokens that came from this device (matching ip+ua)
@@ -88,7 +88,7 @@ async def revoke_session(session_id: str, user=Depends(current_user), request: R
         if dev:
             await mongo.refresh_tokens().update_many(
                 {"userId": user["_id"], "ip": dev.get("ip"), "userAgent": dev.get("userAgent"), "revoked": False},
-                {"$set": {"revoked": True, "revokedAt": datetime.now(tz=timezone.utc)}},
+                {"$set": {"revoked": True, "revokedAt": datetime.now(tz=UTC)}},
             )
         await log_action(
             actor_id=str(user["_id"]), action="security.device_revoked",
@@ -100,7 +100,7 @@ async def revoke_session(session_id: str, user=Depends(current_user), request: R
     # Try refresh token
     res = await mongo.refresh_tokens().update_one(
         {"_id": oid, "userId": user["_id"], "revoked": False},
-        {"$set": {"revoked": True, "revokedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"revoked": True, "revokedAt": datetime.now(tz=UTC)}},
     )
     if res.matched_count == 0:
         raise HTTPException(404, "session not found")
@@ -127,7 +127,7 @@ async def revoke_other_sessions(user=Depends(current_user), request: Request = N
             {"ip": {"$ne": dev.get("ip")}},
             {"userAgent": {"$ne": dev.get("userAgent")}},
         ]},
-        {"$set": {"revoked": True, "revokedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"revoked": True, "revokedAt": datetime.now(tz=UTC)}},
     )
     await log_action(actor_id=str(user["_id"]), action="security.other_sessions_revoked", resource=f"user:{user['_id']}")
 

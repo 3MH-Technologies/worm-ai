@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 import jwt
 from bson import ObjectId
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.cache.redis import allow
@@ -109,7 +109,7 @@ async def rate_limit(
 async def update_last_login(user_id: ObjectId) -> None:
     await mongo.users().update_one(
         {"_id": user_id},
-        {"$set": {"lastLogin": datetime.now(tz=timezone.utc)}},
+        {"$set": {"lastLogin": datetime.now(tz=UTC)}},
     )
 
 

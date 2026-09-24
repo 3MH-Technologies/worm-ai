@@ -6,8 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -17,7 +16,7 @@ from app.api.deps import current_user, enforce_approval, rate_limit
 from app.api.v1.web import _ddg_search, _fetch_content, _serper_search, _tavily_search
 from app.core.config import get_settings
 from app.db import mongo
-from app.models.extras import ResearchRequest, ResearchReport, ResearchSource
+from app.models.extras import ResearchReport, ResearchRequest, ResearchSource
 from app.services import notrack
 
 log = logging.getLogger(__name__)
@@ -98,8 +97,8 @@ async def run_research(
             "content": report_text,
             "metadata": {"sources": [s.model_dump() for s in sources]},
             "currentVersion": 1,
-            "createdAt": datetime.now(tz=timezone.utc),
-            "updatedAt": datetime.now(tz=timezone.utc),
+            "createdAt": datetime.now(tz=UTC),
+            "updatedAt": datetime.now(tz=UTC),
         })
         canvas_id = str(canvas.inserted_id)
         await mongo.canvas_versions().insert_one({
@@ -108,7 +107,7 @@ async def run_research(
             "content": report_text,
             "commitMessage": "research",
             "authorId": user["_id"],
-            "createdAt": datetime.now(tz=timezone.utc),
+            "createdAt": datetime.now(tz=UTC),
         })
 
     report = ResearchReport(
@@ -120,7 +119,7 @@ async def run_research(
         citations=citations,
         modelId=_model_code(payload.modelId),
         canvasId=canvas_id,
-        createdAt=datetime.now(tz=timezone.utc),
+        createdAt=datetime.now(tz=UTC),
     )
     return report
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -51,8 +51,8 @@ def _out(doc: dict) -> SystemPromptOut:
         active=doc.get("active", True),
         currentVersion=doc.get("currentVersion", 1),
         versions=versions,
-        createdAt=doc.get("createdAt") or datetime.now(tz=timezone.utc),
-        updatedAt=doc.get("updatedAt") or datetime.now(tz=timezone.utc),
+        createdAt=doc.get("createdAt") or datetime.now(tz=UTC),
+        updatedAt=doc.get("updatedAt") or datetime.now(tz=UTC),
     )
 
 
@@ -86,7 +86,7 @@ async def get_prompt(prompt_id: str, user=Depends(current_user)) -> SystemPrompt
 async def create_prompt(payload: SystemPromptCreate, user=Depends(current_user)) -> SystemPromptOut:
     if not await _is_admin(user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin only")
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     doc = {
         "name": payload.name,
         "description": payload.description,
@@ -120,7 +120,7 @@ async def update_prompt(prompt_id: str, payload: SystemPromptUpdate, user=Depend
             "version": next_v,
             "content": updates["content"],
             "changelog": changelog or "edit",
-            "createdAt": datetime.now(tz=timezone.utc),
+            "createdAt": datetime.now(tz=UTC),
         }
         await mongo.system_prompts().update_one(
             {"_id": doc["_id"]},
@@ -128,7 +128,7 @@ async def update_prompt(prompt_id: str, payload: SystemPromptUpdate, user=Depend
         )
         new_version = True
     if updates:
-        updates["updatedAt"] = datetime.now(tz=timezone.utc)
+        updates["updatedAt"] = datetime.now(tz=UTC)
         await mongo.system_prompts().update_one({"_id": doc["_id"]}, {"$set": updates})
     fresh = await mongo.system_prompts().find_one({"_id": doc["_id"]})
     await log_action(actor_id=str(user["_id"]), action="prompt.update", resource=f"prompt:{prompt_id}", metadata={"newVersion": new_version})

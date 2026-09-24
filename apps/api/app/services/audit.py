@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.db import mongo
@@ -24,5 +24,5 @@ async def log_action(
         "ipAddress": ip,
         "userAgent": user_agent,
         "metadata": metadata or {},
-        "timestamp": datetime.now(tz=timezone.utc),
+        "timestamp": datetime.now(tz=UTC),
     })

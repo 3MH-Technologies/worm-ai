@@ -11,7 +11,7 @@ Mitigations applied here:
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 # Phrases that often appear in injection attempts. We strip them defensively.
 _BAD_PATTERNS: tuple[re.Pattern[str], ...] = (

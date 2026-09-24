@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.api.deps import current_user, enforce_approval, public_user, update_last_login
+from app.api.deps import current_user, public_user
 from app.core.config import get_settings
 from app.core.security import (
     create_access_token,
@@ -21,7 +21,6 @@ from app.core.security import (
 )
 from app.db import mongo
 from app.models.auth import (
-    AdminUserUpdateIn,
     LoginIn,
     PasswordChangeIn,
     RefreshIn,
@@ -49,7 +48,7 @@ async def _build_tokens(user: dict, request: Request) -> TokenPair:
         "sessionId": session_id,
         "ip": request.client.host if request.client else None,
         "userAgent": request.headers.get("user-agent"),
-        "createdAt": datetime.now(tz=timezone.utc),
+        "createdAt": datetime.now(tz=UTC),
         "expiresAt": exp,
         "revoked": False,
         "revokedAt": None,
@@ -71,7 +70,7 @@ async def register(payload: RegisterIn, request: Request) -> TokenPair:
     # First user ever becomes superadmin + approved automatically
     is_first = await mongo.users().count_documents({}) == 0
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     doc = {
         "username": payload.username,
         "email": payload.email.lower(),
@@ -128,7 +127,7 @@ async def login(payload: LoginIn, request: Request) -> TokenPair:
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
 
-    if user.get("lockedUntil") and user["lockedUntil"] > datetime.now(tz=timezone.utc):
+    if user.get("lockedUntil") and user["lockedUntil"] > datetime.now(tz=UTC):
         raise HTTPException(status.HTTP_423_LOCKED, "account temporarily locked")
 
     if not verify_password(payload.password, user["passwordHash"]):
@@ -136,7 +135,7 @@ async def login(payload: LoginIn, request: Request) -> TokenPair:
         update: dict = {"failedLoginAttempts": attempts}
         if attempts >= 8:
             from datetime import timedelta
-            update["lockedUntil"] = datetime.now(tz=timezone.utc) + timedelta(minutes=15)
+            update["lockedUntil"] = datetime.now(tz=UTC) + timedelta(minutes=15)
             update["failedLoginAttempts"] = 0
         await mongo.users().update_one({"_id": user["_id"]}, {"$set": update})
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
@@ -145,11 +144,11 @@ async def login(payload: LoginIn, request: Request) -> TokenPair:
     fp = device_fingerprint(request.headers.get("user-agent", ""), request.client.host if request.client else "")
     await mongo.devices().update_one(
         {"userId": user["_id"], "fingerprint": fp},
-        {"$set": {"lastSeen": datetime.now(tz=timezone.utc)}, "$setOnInsert": {
+        {"$set": {"lastSeen": datetime.now(tz=UTC)}, "$setOnInsert": {
             "userId": user["_id"], "fingerprint": fp,
             "userAgent": request.headers.get("user-agent"),
             "ip": request.client.host if request.client else None,
-            "firstSeen": datetime.now(tz=timezone.utc),
+            "firstSeen": datetime.now(tz=UTC),
             "trusted": False,
         }},
         upsert=True,
@@ -157,9 +156,9 @@ async def login(payload: LoginIn, request: Request) -> TokenPair:
 
     await mongo.users().update_one(
         {"_id": user["_id"]},
-        {"$set": {"failedLoginAttempts": 0, "lockedUntil": None, "lastLogin": datetime.now(tz=timezone.utc)}},
+        {"$set": {"failedLoginAttempts": 0, "lockedUntil": None, "lastLogin": datetime.now(tz=UTC)}},
     )
-    user["lastLogin"] = datetime.now(tz=timezone.utc)
+    user["lastLogin"] = datetime.now(tz=UTC)
     user["failedLoginAttempts"] = 0
     user["lockedUntil"] = None
 
@@ -189,7 +188,7 @@ async def refresh(payload: RefreshIn, request: Request) -> TokenPair:
     if not stored:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "refresh token revoked or reused")
     # Rotation: revoke the old token immediately (prevents token reuse on theft)
-    now_dt = datetime.now(tz=timezone.utc)
+    now_dt = datetime.now(tz=UTC)
     await mongo.refresh_tokens().update_one(
         {"_id": stored["_id"]},
         {"$set": {"revoked": True, "revokedAt": now_dt}},
@@ -204,7 +203,7 @@ async def refresh(payload: RefreshIn, request: Request) -> TokenPair:
 async def logout(payload: RefreshIn, user=Depends(current_user)) -> None:  # type: ignore[assignment]
     await mongo.refresh_tokens().update_one(
         {"token": payload.refreshToken},
-        {"$set": {"revoked": True, "revokedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"revoked": True, "revokedAt": datetime.now(tz=UTC)}},
     )
     await log_action(actor_id=str(user["_id"]), action="auth.logout", resource=f"user:{user['_id']}")
 
@@ -212,7 +211,7 @@ async def logout(payload: RefreshIn, user=Depends(current_user)) -> None:  # typ
 @router.post("/logout-all", status_code=204)
 async def logout_all(user=Depends(current_user)) -> None:
     """Revoke ALL refresh tokens and invalidate all devices for the current user."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     await mongo.refresh_tokens().update_many(
         {"userId": user["_id"], "revoked": False},
         {"$set": {"revoked": True, "revokedAt": now}},
@@ -234,7 +233,7 @@ async def update_me(payload: UserUpdateIn, user=Depends(current_user)) -> dict:
     updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     if not updates:
         return public_user(user)
-    updates["updatedAt"] = datetime.now(tz=timezone.utc)
+    updates["updatedAt"] = datetime.now(tz=UTC)
     await mongo.users().update_one({"_id": user["_id"]}, {"$set": updates})
     fresh = await mongo.users().find_one({"_id": user["_id"]})
     return public_user(fresh)
@@ -246,6 +245,6 @@ async def change_password(payload: PasswordChangeIn, user=Depends(current_user))
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "old password is incorrect")
     await mongo.users().update_one(
         {"_id": user["_id"]},
-        {"$set": {"passwordHash": hash_password(payload.newPassword), "updatedAt": datetime.now(tz=timezone.utc)}},
+        {"$set": {"passwordHash": hash_password(payload.newPassword), "updatedAt": datetime.now(tz=UTC)}},
     )
     await log_action(actor_id=str(user["_id"]), action="auth.password_changed", resource=f"user:{user['_id']}")

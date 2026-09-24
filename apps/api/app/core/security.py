@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 import bcrypt
@@ -40,7 +40,7 @@ def create_access_token(
     extra: dict[str, Any] | None = None,
 ) -> str:
     s = get_settings()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     payload: dict[str, Any] = {
         "sub": sub,
         "role": role,
@@ -58,7 +58,7 @@ def create_access_token(
 
 def create_refresh_token(*, sub: str, session_id: str) -> tuple[str, datetime]:
     s = get_settings()
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     exp = now + timedelta(days=s.jwt_refresh_ttl_day)
     payload = {
         "sub": sub,
@@ -87,4 +87,4 @@ def hash_csrf(token: str) -> str:
 
 # ---- Device fingerprint ----
 def device_fingerprint(user_agent: str, ip: str) -> str:
-    return hashlib.sha256(f"{user_agent}|{ip}".encode("utf-8")).hexdigest()[:32]
+    return hashlib.sha256(f"{user_agent}|{ip}".encode()).hexdigest()[:32]

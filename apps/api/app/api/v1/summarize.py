@@ -4,7 +4,7 @@ slice so the system prompt never grows uncontrollably."""
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -40,7 +40,7 @@ async def summarize(cid: str, user=Depends(current_user)) -> dict:
     # Fresh notrack chat (no chat_id) so the summary request doesn't pollute the conversation.
     summary, _ = await notrack.get_notrack().complete(f"{SUMMARIZE_PROMPT}\n\n{history_text}")
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     # remove old summaries for this conversation
     await mongo.memories().delete_many({"userId": user["_id"], "kind": "summary", "source": f"conversation:{cid}"})
     mem_doc = {
