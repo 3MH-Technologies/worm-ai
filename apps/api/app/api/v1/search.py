@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from app.api.deps import current_user
 from app.db import mongo
 from app.models.extras import SearchHit, SearchResponse
+from app.services.notrack import NOTRACK_MODEL_DESCRIPTIONS, NOTRACK_MODELS
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -48,14 +49,17 @@ async def search(
         async for d in cursor:
             await push("message", str(d["_id"]), f"{d['role'].title()} message", d["content"][:240], float(d.get("score") or 0), conversationId=str(d["conversationId"]))
 
-    # models (admin/dev panel can also use)
+    # models — the catalogue is static (see app/api/v1/models.py), so match it
+    # in-process instead of running a $text query that would need a Mongo text
+    # index that no longer exists.
     if "model" in requested:
-        cursor = mongo.models_col().find(
-            {"$text": {"$search": q}, "enabled": True},
-            {"score": {"$meta": "textScore"}, "name": 1, "provider": 1, "description": 1},
-        ).sort([("score", {"$meta": "textScore"})]).limit(limit)
-        async for d in cursor:
-            await push("model", str(d["_id"]), d["name"], (d.get("description") or d["provider"])[:200], float(d.get("score") or 0))
+        needle = q.lower()
+        for code, name in NOTRACK_MODELS.items():
+            desc = NOTRACK_MODEL_DESCRIPTIONS.get(code) or ""
+            hay = f"{code} {name} {desc}".lower()
+            if needle in hay:
+                score = 1.0 if needle in name.lower() else 0.6
+                await push("model", code, name, desc[:200], score)
 
     # canvas
     if "canvas" in requested:

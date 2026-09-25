@@ -79,3 +79,6 @@ workspace-*.tar.gz
 # generated
 apps/api/.mypy_cache/
 apps/web/.next/cache/
+
+# runtime uploads (chat attachments live here locally)
+apps/api/attachments/

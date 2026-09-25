@@ -50,24 +50,39 @@ async def _gather_sources(query: str, max_sources: int) -> list[ResearchSource]:
     return results
 
 
+# The chat backend rejects user_input longer than 4000 chars (see notrack.py),
+# so the whole prompt — instructions, query, and sources — has to fit under it.
+_PROMPT_CHAR_BUDGET = 3800
+_INSTRUCTIONS = (
+    "You are a meticulous research analyst. Synthesise the provided sources into a "
+    "long-form, well-cited report. Use inline numeric citations like [1], [2] that "
+    "correspond to the sources. Avoid speculation. Quote or paraphrase faithfully. "
+    "Structure: Executive Summary, Key Findings, Detailed Analysis, Caveats, References."
+)
+
+
 def _build_prompt(query: str, sources: list[ResearchSource]) -> str:
-    s_blocks = []
-    for i, src in enumerate(sources, start=1):
-        body = (src.content or src.snippet)[:3500]
-        s_blocks.append(f"[{i}] {src.title}\nURL: {src.url}\n{body}\n")
-    sources_blob = "\n\n".join(s_blocks)
-    system = (
-        "You are a meticulous research analyst. Synthesise the provided sources into a "
-        "long-form, well-cited report. Use inline numeric citations like [1], [2] that "
-        "correspond to the sources. Avoid speculation. Quote or paraphrase faithfully. "
-        "Structure: Executive Summary, Key Findings, Detailed Analysis, Caveats, References."
+    system = _INSTRUCTIONS
+    tail = (
+        "\n\nProduce a thorough report with inline numeric citations. End with a "
+        "'References' list that reproduces each source title + URL."
     )
-    user_prompt = (
-        f"Question: {query}\n\nSOURCES:\n{sources_blob}\n\n"
-        "Produce a thorough report with inline numeric citations. End with a 'References' "
-        "list that reproduces each source title + URL."
-    )
-    return f"{system}\n\n{user_prompt}"
+    wrapper = len(system) + len(tail) + len(query) + len("Question: \n\nSOURCES:\n")
+    # Each block costs its "[n] title\nURL: url\n" header on top of the body.
+    headers = [f"[{i}] {s.title}\nURL: {s.url}\n" for i, s in enumerate(sources, start=1)]
+    header_total = sum(len(h) + 2 for h in headers)  # +2 for the block separator
+    body_budget = max((_PROMPT_CHAR_BUDGET - wrapper - header_total) // max(len(sources), 1), 0)
+
+    blocks = []
+    for header, src in zip(headers, sources):
+        body = src.content or src.snippet or ""
+        if len(body) > body_budget:
+            body = body[:body_budget]
+        blocks.append(header + body)
+
+    prompt = f"{system}\n\nQuestion: {query}\n\nSOURCES:\n" + "\n\n".join(blocks) + tail
+    # Belt and braces: the upstream hard-fails past 4000 chars.
+    return prompt[:_PROMPT_CHAR_BUDGET]
 
 
 @router.post("/run", response_model=ResearchReport)

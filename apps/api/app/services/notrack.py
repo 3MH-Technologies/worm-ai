@@ -51,6 +51,10 @@ NOTRACK_PERSONAS: tuple[str, ...] = (
 
 _MAX_ATTEMPTS = 5
 
+# The dispatch endpoint hard-rejects user_input longer than this (HTTP 400
+# "user_input too long"). Callers must truncate or reject before sending.
+MAX_USER_INPUT = 4000
+
 
 class NotrackError(RuntimeError):
     """Raised when the notrack.ai API fails permanently."""
@@ -116,6 +120,9 @@ class NotrackClient:
             model = "C"
         if persona not in NOTRACK_PERSONAS:
             persona = "normal"
+        # Safety cap: the dispatch endpoint rejects longer input with HTTP 400.
+        if len(user_input) > MAX_USER_INPUT:
+            user_input = user_input[:MAX_USER_INPUT]
         body: dict[str, Any] = {
             "user_input": user_input,
             "mode": "usual",

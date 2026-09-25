@@ -312,6 +312,51 @@ async def react_message(cid: str, mid: str, payload: MessageReaction, user=Depen
 
 
 # ---- Streaming (internal chat backend) ----
+# Inline image attachments are shipped to the model as data URLs; text files are
+# skipped (the upstream dispatch only understands image payloads).
+_ATTACHMENT_MAX_COUNT = 4
+_ATTACHMENT_MAX_EACH = 8 * 1024 * 1024
+_ATTACHMENT_MAX_TOTAL = 16 * 1024 * 1024
+
+
+async def _model_attachments(
+    items: list[dict[str, Any]] | None, user_id: ObjectId
+) -> list[str]:
+    import base64
+
+    from app.api.v1.attachments import _storage_dir
+
+    out: list[str] = []
+    total = 0
+    for item in items or []:
+        if len(out) >= _ATTACHMENT_MAX_COUNT:
+            break
+        att_id = item.get("id") if isinstance(item, dict) else None
+        if not att_id or not ObjectId.is_valid(str(att_id)):
+            continue
+        doc = await mongo.attachments().find_one({"_id": ObjectId(str(att_id)), "userId": user_id})
+        if not doc:
+            continue
+        mime = str(doc.get("mimeType") or "")
+        if not mime.startswith("image/"):
+            continue
+        size = int(doc.get("size") or 0)
+        if size > _ATTACHMENT_MAX_EACH or total + size > _ATTACHMENT_MAX_TOTAL:
+            log.warning("skipping oversized attachment id=%s size=%s", att_id, size)
+            continue
+        path = _storage_dir() / doc.get("storageKey", "")
+        if not path.exists():
+            continue
+        try:
+            raw = await asyncio.to_thread(path.read_bytes)
+        except OSError as e:
+            log.warning("attachment read failed id=%s err=%s", att_id, e)
+            continue
+        out.append(f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}")
+        total += size
+    return out
+
+
 def _resolve_model_code(conv: dict, requested_model_id: str | None) -> str:
     """Resolve the notrack model code (A/B/C/F) for this turn."""
     settings = get_settings()
@@ -342,6 +387,12 @@ async def stream_message(
     content = (payload.content or "").strip()
     if not regenerate and not content:
         raise HTTPException(400, "message content is required")
+    if len(content) > notrack.MAX_USER_INPUT:
+        raise HTTPException(
+            400,
+            f"Message is too long ({len(content)} characters). "
+            f"The limit is {notrack.MAX_USER_INPUT} — try splitting it or attaching a file.",
+        )
 
     now = datetime.now(tz=UTC)
     user_msg_id: ObjectId | None = None
@@ -385,6 +436,13 @@ async def stream_message(
         search_text = await _web_search_for_chat(content)
         if search_text:
             content_to_send = f"{content}\n\n## Current Web Search Results\n\n{search_text}"
+    # Web results are appended after the length check, so re-cap here — the
+    # upstream rejects anything past MAX_USER_INPUT outright.
+    content_to_send = content_to_send[: notrack.MAX_USER_INPUT]
+
+    # Ship the turn's image attachments to the model (data URLs); only when the
+    # caller supplied them — regenerate replays the upstream chat instead.
+    model_attachments = await _model_attachments(payload.attachments, user["_id"])
 
     client = notrack.get_notrack()
 
@@ -407,6 +465,7 @@ async def stream_message(
                 model=model_code,
                 persona=settings.notrack_persona,
                 max_turns=settings.notrack_max_turns,
+                attachments=model_attachments or None,
                 regenerate=regenerate,
             ):
                 if await request.is_disconnected():
@@ -431,6 +490,7 @@ async def stream_message(
                         buffer.append("\n\n")
                         yield {"event": "delta", "data": json.dumps({"text": "\n\n"})}
                 elif et == "error":
+                    finish_reason = "error"
                     yield {"event": "error", "data": json.dumps({"message": ev.get("message") or "upstream error"})}
             if finish_reason is None:
                 finish_reason = "stop"
@@ -439,31 +499,33 @@ async def stream_message(
             finish_reason = "cancelled"
         except Exception as e:
             log.exception("stream error: %s", e)
-            buffer.append(f"\n\n[Error: {type(e).__name__}: {e}]")
             finish_reason = "error"
             yield {"event": "error", "data": json.dumps({"message": str(e)})}
         finally:
-            full = "".join(buffer)
+            full = "".join(buffer).strip()
             now2 = datetime.now(tz=UTC)
-            # Save assistant message
-            assistant_doc = {
-                "conversationId": conv["_id"],
-                "userId": user["_id"],
-                "role": "assistant",
-                "content": full,
-                "tokens": notrack.count_tokens(full),
-                "model": model_name,
-                "metadata": {
-                    "latency_ms": int((time.perf_counter() - start) * 1000),
-                    "ttft_ms": int(((first_token_at or time.perf_counter()) - start) * 1000),
-                    "finish_reason": finish_reason,
-                    "provider": "internal",
-                },
-                "parentId": user_msg_id,
-                "createdAt": now2,
-            }
-            res = await mongo.messages().insert_one(assistant_doc)
-            assistant_id = res.inserted_id
+            # A failed stream must not persist "[Error: …]" or an empty assistant
+            # turn — only real output becomes a message.
+            assistant_id: ObjectId | None = None
+            if full:
+                assistant_doc = {
+                    "conversationId": conv["_id"],
+                    "userId": user["_id"],
+                    "role": "assistant",
+                    "content": full,
+                    "tokens": notrack.count_tokens(full),
+                    "model": model_name,
+                    "metadata": {
+                        "latency_ms": int((time.perf_counter() - start) * 1000),
+                        "ttft_ms": int(((first_token_at or time.perf_counter()) - start) * 1000),
+                        "finish_reason": finish_reason,
+                        "provider": "internal",
+                    },
+                    "parentId": user_msg_id,
+                    "createdAt": now2,
+                }
+                res = await mongo.messages().insert_one(assistant_doc)
+                assistant_id = res.inserted_id
 
             # Save as Canvas if requested
             canvas_id: ObjectId | None = None
@@ -492,15 +554,16 @@ async def stream_message(
                 })
 
             done_data: dict[str, Any] = {
-                "assistantMessageId": str(assistant_id),
-                "tokens": assistant_doc["tokens"],
-                "latency_ms": assistant_doc["metadata"]["latency_ms"],
-                "ttft_ms": assistant_doc["metadata"]["ttft_ms"],
+                "assistantMessageId": str(assistant_id) if assistant_id else None,
+                "tokens": assistant_doc["tokens"] if full else 0,
+                "latency_ms": int((time.perf_counter() - start) * 1000),
+                "ttft_ms": int(((first_token_at or time.perf_counter()) - start) * 1000),
             }
             if canvas_id:
                 done_data["canvasId"] = str(canvas_id)
             yield {"event": "done", "data": json.dumps(done_data)}
-            background.add_task(_track_usage, user["_id"], assistant_doc["tokens"], "internal")
+            if full:
+                background.add_task(_track_usage, user["_id"], notrack.count_tokens(full), "internal")
 
     return EventSourceResponse(event_gen())
 

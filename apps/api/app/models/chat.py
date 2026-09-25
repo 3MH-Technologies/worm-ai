@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 Role = Literal["user", "assistant", "system", "tool"]
 
@@ -26,7 +26,13 @@ class MessageEdit(BaseModel):
 
 
 class MessageReaction(BaseModel):
-    reaction: Literal["like", "dislike", "love", "laugh", "sad"]
+    # None (or "", from older clients) clears the reaction.
+    reaction: Literal["like", "dislike", "love", "laugh", "sad"] | None = None
+
+    @field_validator("reaction", mode="before")
+    @classmethod
+    def _empty_is_clear(cls, v: object) -> object:
+        return None if v == "" else v
 
 
 class MessageOut(BaseModel):

@@ -480,39 +480,46 @@ async def agent_stream(
                     messages.append({"role": "tool", "tool_call_id": call_id, "content": result_text[:8000]})
         except Exception as e:
             log.exception("agent stream error: %s", e)
-            buffer.append(f"\n\n[Agent error: {type(e).__name__}: {e}]")
+            # The stream already reports the failure to the client (toast) —
+            # never persist "[Agent error: …]" as an assistant bubble.
             finish_reason = "error"
             yield {"event": "error", "data": json.dumps({"message": str(e)})}
         finally:
             full = "".join(buffer).strip()
             now2 = datetime.now(tz=UTC)
-            assistant_doc = {
-                "conversationId": conv["_id"],
-                "userId": user["_id"],
-                "role": "assistant",
-                "content": full,
-                "tokens": _count_tokens(full),
-                "model": model_name,
-                "metadata": {
-                    "provider": "internal",
-                    "model": model,
-                    "finish_reason": finish_reason,
-                    "iterations": iterations,
-                    "latency_ms": int((time.perf_counter() - start) * 1000),
-                    "ttft_ms": int(((first_token_at or time.perf_counter()) - start) * 1000),
-                    "tools": tools_used,
-                },
-                "parentId": None,
-                "createdAt": now2,
-            }
-            res = await mongo.messages().insert_one(assistant_doc)
-            await mongo.conversations().update_one(
-                {"_id": conv["_id"]},
-                {"$set": {"updatedAt": now2, "lastMessageAt": now2}},
-            )
+            assistant_id: str | None = None
+            saved_tokens = 0
+            # Persist only real model output: skip blank turns and error-only turns.
+            if full:
+                assistant_doc = {
+                    "conversationId": conv["_id"],
+                    "userId": user["_id"],
+                    "role": "assistant",
+                    "content": full,
+                    "tokens": _count_tokens(full),
+                    "model": model_name,
+                    "metadata": {
+                        "provider": "internal",
+                        "model": model,
+                        "finish_reason": finish_reason,
+                        "iterations": iterations,
+                        "latency_ms": int((time.perf_counter() - start) * 1000),
+                        "ttft_ms": int(((first_token_at or time.perf_counter()) - start) * 1000),
+                        "tools": tools_used,
+                    },
+                    "parentId": None,
+                    "createdAt": now2,
+                }
+                res = await mongo.messages().insert_one(assistant_doc)
+                assistant_id = str(res.inserted_id)
+                saved_tokens = assistant_doc["tokens"] or 0
+                await mongo.conversations().update_one(
+                    {"_id": conv["_id"]},
+                    {"$set": {"updatedAt": now2, "lastMessageAt": now2}},
+                )
             yield {"event": "done", "data": json.dumps({
-                "assistantMessageId": str(res.inserted_id),
-                "tokens": assistant_doc["tokens"],
+                "assistantMessageId": assistant_id,
+                "tokens": saved_tokens,
                 "iterations": iterations,
                 "tools": len(tools_used),
             })}

@@ -230,7 +230,9 @@ async def me(user=Depends(current_user)) -> dict:
 
 @router.patch("/me")
 async def update_me(payload: UserUpdateIn, user=Depends(current_user)) -> dict:
-    updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
+    # exclude_unset (not exclude_none): an explicit `avatar: null` means "clear the
+    # avatar" and must reach Mongo, while an omitted field stays untouched.
+    updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
     if not updates:
         return public_user(user)
     updates["updatedAt"] = datetime.now(tz=UTC)
