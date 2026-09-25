@@ -20,7 +20,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.deps import current_user, enforce_approval, rate_limit
+from app.api.deps import current_user, rate_limit
 from app.core.config import get_settings
 from app.db import mongo
 from app.models.chat import MessageCreate
@@ -299,7 +299,6 @@ async def agent_models() -> list[dict[str, Any]]:
             "id": mid,
             "name": m["name"],
             "description": m["description"],
-            "provider": "internal",
             "enabled": True,
             "configured": configured,
         }
@@ -313,7 +312,6 @@ async def agent_status() -> dict[str, Any]:
     return {
         "configured": deepseek.DeepSeekClient.configured(),
         "models": list(deepseek.AGENT_MODELS.keys()),
-        "provider": "internal",
     }
 
 
@@ -333,7 +331,6 @@ async def agent_stream(
 
     Events: start, thinking, delta, tool, tool_result, done, error
     """
-    await enforce_approval(user)
     if not deepseek.DeepSeekClient.configured():
         raise HTTPException(
             400,

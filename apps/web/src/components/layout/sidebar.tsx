@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   SquarePen, Search, Trash2, Pencil, Check, X, PanelLeftClose, MoreHorizontal,
-  Settings, LogOut, Shield, User as UserIcon, Bot,
+  Settings, LogOut, User as UserIcon, Bot,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -256,11 +256,6 @@ export function Sidebar() {
             <DropdownMenuItem onClick={() => router.push('/settings')}>
               <Settings className="h-4 w-4" /> Settings
             </DropdownMenuItem>
-            {user?.role && ['admin', 'superadmin', 'developer'].includes(user.role) && (
-              <DropdownMenuItem onClick={() => router.push('/admin')}>
-                <Shield className="h-4 w-4" /> Admin panel
-              </DropdownMenuItem>
-            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={async () => { await logout(); router.push('/login') }}>
               <LogOut className="h-4 w-4" /> Log out

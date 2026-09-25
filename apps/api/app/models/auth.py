@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models import PublicUser, Role, Status
+from app.models import PublicUser
 
 
 class RegisterIn(BaseModel):
@@ -42,22 +42,6 @@ class UserUpdateIn(BaseModel):
     avatar: str | None = None
 
 
-class AdminUserUpdateIn(BaseModel):
-    role: Role | None = None
-    status: Status | None = None
-
-
-class AuditLogOut(BaseModel):
-    id: str
-    actorId: str
-    actorUsername: str | None = None
-    action: str
-    resource: str
-    ipAddress: str | None = None
-    userAgent: str | None = None
-    timestamp: datetime
-
-
 class NotificationOut(BaseModel):
     id: str
     title: str
@@ -65,10 +49,3 @@ class NotificationOut(BaseModel):
     read: bool
     createdAt: datetime
     kind: Literal["info", "warning", "success", "error"] = "info"
-
-
-class UserListOut(BaseModel):
-    items: list[PublicUser]
-    total: int
-    page: int
-    size: int

@@ -27,7 +27,6 @@ class TimestampMixin(BaseModel):
     updatedAt: datetime | None = None
 
 
-Role = Literal["user", "moderator", "developer", "admin", "superadmin"]
 Status = Literal["pending", "approved", "rejected", "suspended"]
 
 
@@ -35,7 +34,6 @@ class PublicUser(BaseModel):
     id: str
     username: str
     email: EmailStr
-    role: Role
     status: Status
     avatar: str | None = None
     createdAt: datetime | None = None

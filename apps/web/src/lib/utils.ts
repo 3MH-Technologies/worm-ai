@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { Role } from './types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -41,12 +40,4 @@ export function bytes(n: number) {
 
 export function safeJSON<T>(text: string, fallback: T): T {
   try { return JSON.parse(text) } catch { return fallback }
-}
-
-export function isDeveloper(role?: Role): boolean {
-  return !!role && ['developer', 'admin', 'superadmin'].includes(role)
-}
-
-export function isAdmin(role?: Role): boolean {
-  return !!role && ['admin', 'superadmin'].includes(role)
 }

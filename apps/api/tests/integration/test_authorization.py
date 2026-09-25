@@ -1,4 +1,5 @@
-"""Integration tests for RBAC, IDOR prevention, and ownership checks.
+"""Integration tests for removed admin/RBAC surfaces, IDOR prevention,
+and ownership checks.
 
 Requires a running MongoDB instance.
 """
@@ -6,12 +7,8 @@ Requires a running MongoDB instance.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
 
 import pytest
-from bson import ObjectId
-
-from app.db import mongo
 
 pytestmark = [
     pytest.mark.skipif(
@@ -21,69 +18,34 @@ pytestmark = [
 ]
 
 
-class TestAdminRoutes:
-    """Verify only admin/superadmin can access admin endpoints."""
+class TestAdminRemoved:
+    """The admin API no longer exists at all."""
 
-    async def test_admin_users_requires_admin(self, client, regular_user_token):
+    async def test_admin_users_route_gone(self, client, regular_user_token):
         headers = {"Authorization": f"Bearer {regular_user_token}"}
         r = await client.get("/api/v1/admin/users", headers=headers)
-        assert r.status_code == 403
+        assert r.status_code == 404
 
-    async def test_admin_users_allows_admin(self, client, admin_token):
-        headers = {"Authorization": f"Bearer {admin_token}"}
-        r = await client.get("/api/v1/admin/users", headers=headers)
-        assert r.status_code == 200
-
-    async def test_admin_users_allows_superadmin(self, client, superadmin_token):
-        headers = {"Authorization": f"Bearer {superadmin_token}"}
-        r = await client.get("/api/v1/admin/users", headers=headers)
-        assert r.status_code == 200
-
-    async def test_admin_stats_requires_admin(self, client, regular_user_token):
+    async def test_admin_stats_route_gone(self, client, regular_user_token):
         headers = {"Authorization": f"Bearer {regular_user_token}"}
         r = await client.get("/api/v1/admin/stats", headers=headers)
-        assert r.status_code == 403
+        assert r.status_code == 404
 
-    async def test_admin_audit_logs_requires_admin(self, client, regular_user_token):
+    async def test_admin_audit_logs_route_gone(self, client, regular_user_token):
         headers = {"Authorization": f"Bearer {regular_user_token}"}
         r = await client.get("/api/v1/admin/audit-logs", headers=headers)
-        assert r.status_code == 403
+        assert r.status_code == 404
 
+    async def test_prompts_routes_gone(self, client, regular_user_token):
+        headers = {"Authorization": f"Bearer {regular_user_token}"}
+        r = await client.get("/api/v1/system-prompts", headers=headers)
+        assert r.status_code == 404
 
-class TestPrivilegeEscalation:
-    """Verify non-superadmin cannot promote to admin/superadmin."""
-
-    async def test_admin_cannot_promote_to_superadmin(self, client, admin_token, regular_user):
-        headers = {"Authorization": f"Bearer {admin_token}"}
-        uid = str(regular_user["_id"])
-        r = await client.patch(
-            f"/api/v1/admin/users/{uid}",
-            json={"role": "superadmin"},
-            headers=headers,
-        )
-        assert r.status_code == 403
-
-    async def test_admin_cannot_promote_to_admin(self, client, admin_token, pending_user):
-        """Non-superadmin admin cannot grant admin role."""
-        headers = {"Authorization": f"Bearer {admin_token}"}
-        uid = str(pending_user["_id"])
-        r = await client.patch(
-            f"/api/v1/admin/users/{uid}",
-            json={"role": "admin"},
-            headers=headers,
-        )
-        assert r.status_code == 403
-
-    async def test_superadmin_can_promote(self, client, superadmin_token, regular_user):
-        headers = {"Authorization": f"Bearer {superadmin_token}"}
-        uid = str(regular_user["_id"])
-        r = await client.patch(
-            f"/api/v1/admin/users/{uid}",
-            json={"role": "admin"},
-            headers=headers,
-        )
+    async def test_me_has_no_role_field(self, client, regular_user_token):
+        headers = {"Authorization": f"Bearer {regular_user_token}"}
+        r = await client.get("/api/v1/auth/me", headers=headers)
         assert r.status_code == 200
-        assert r.json()["role"] == "admin"
+        assert "role" not in r.json()
 
 
 class TestIDOR:
@@ -99,19 +61,19 @@ class TestIDOR:
         assert r.status_code == 201
         return r.json()["id"]
 
-    async def test_cannot_access_other_conversation(self, client, regular_user_token, admin_token):
+    async def test_cannot_access_other_conversation(self, client, regular_user_token, second_user_token):
         uid1 = await self._create_user_conversation(regular_user_token, client)
-        headers = {"Authorization": f"Bearer {admin_token}"}
+        headers = {"Authorization": f"Bearer {second_user_token}"}
         r = await client.get(f"/api/v1/chat/conversations/{uid1}", headers=headers)
         assert r.status_code == 404
 
-    async def test_cannot_delete_other_conversation(self, client, regular_user_token, admin_token):
+    async def test_cannot_delete_other_conversation(self, client, regular_user_token, second_user_token):
         cid = await self._create_user_conversation(regular_user_token, client)
-        headers = {"Authorization": f"Bearer {admin_token}"}
+        headers = {"Authorization": f"Bearer {second_user_token}"}
         r = await client.delete(f"/api/v1/chat/conversations/{cid}", headers=headers)
         assert r.status_code == 404
 
-    async def test_cannot_react_to_other_message(self, client, regular_user_token, admin_token):
+    async def test_cannot_react_to_other_message(self, client, regular_user_token, second_user_token):
         # Create conversation as regular user
         cid = await self._create_user_conversation(regular_user_token, client)
         headers = {"Authorization": f"Bearer {regular_user_token}"}
@@ -124,16 +86,16 @@ class TestIDOR:
         )
         mid = r.json()["id"]
 
-        # Admin tries to react (should have no ownership of the conversation)
-        admin_headers = {"Authorization": f"Bearer {admin_token}"}
+        # Another user tries to react (should have no ownership of the conversation)
+        other_headers = {"Authorization": f"Bearer {second_user_token}"}
         r = await client.post(
             f"/api/v1/chat/conversations/{cid}/messages/{mid}/react",
             json={"reaction": "like"},
-            headers=admin_headers,
+            headers=other_headers,
         )
-        assert r.status_code == 404  # conversation not found for admin
+        assert r.status_code == 404  # conversation not found for them
 
-    async def test_cannot_access_other_canvas(self, client, regular_user_token, admin_token):
+    async def test_cannot_access_other_canvas(self, client, regular_user_token, second_user_token):
         headers = {"Authorization": f"Bearer {regular_user_token}"}
         r = await client.post(
             "/api/v1/canvas",
@@ -142,11 +104,11 @@ class TestIDOR:
         )
         canvas_id = r.json()["id"]
 
-        admin_headers = {"Authorization": f"Bearer {admin_token}"}
-        r = await client.get(f"/api/v1/canvas/{canvas_id}", headers=admin_headers)
+        other_headers = {"Authorization": f"Bearer {second_user_token}"}
+        r = await client.get(f"/api/v1/canvas/{canvas_id}", headers=other_headers)
         assert r.status_code == 404
 
-    async def test_cannot_access_other_memory(self, client, regular_user_token, admin_token):
+    async def test_cannot_access_other_memory(self, client, regular_user_token, second_user_token):
         headers = {"Authorization": f"Bearer {regular_user_token}"}
         r = await client.post(
             "/api/v1/memory",
@@ -155,82 +117,16 @@ class TestIDOR:
         )
         assert r.status_code == 201
 
-        admin_headers = {"Authorization": f"Bearer {admin_token}"}
-        r = await client.get("/api/v1/memory", headers=admin_headers)
+        other_headers = {"Authorization": f"Bearer {second_user_token}"}
+        r = await client.get("/api/v1/memory", headers=other_headers)
         assert r.status_code == 200
         data = r.json()
-        # Admin should see their own memories (empty), not the other user's
+        # The other user should see their own memories (empty), not ours
         assert len(data) == 0
 
 
-class TestPendingUserAccess:
-    """Verify pending users are blocked from creating content."""
-
-    async def test_pending_user_cannot_create_conversation(self, client, pending_user_token):
-        headers = {"Authorization": f"Bearer {pending_user_token}"}
-        r = await client.post(
-            "/api/v1/chat/conversations",
-            json={"title": "Test"},
-            headers=headers,
-        )
-        assert r.status_code == 403
-
-    async def test_pending_user_cannot_stream(self, client, pending_user_token):
-        headers = {"Authorization": f"Bearer {pending_user_token}"}
-        r = await client.post(
-            "/api/v1/chat/conversations/000000000000000000000000/stream",
-            json={"content": "Hello"},
-            headers=headers,
-        )
-        assert r.status_code == 403
-
-    async def test_pending_user_cannot_research(self, client, pending_user_token):
-        headers = {"Authorization": f"Bearer {pending_user_token}"}
-        r = await client.post(
-            "/api/v1/research/run",
-            json={"query": "test", "maxSources": 3},
-            headers=headers,
-        )
-        assert r.status_code == 403
-
-    async def test_pending_user_cannot_upload(self, client, pending_user_token):
-        headers = {"Authorization": f"Bearer {pending_user_token}"}
-        r = await client.post(
-            "/api/v1/attachments",
-            files={"file": ("test.txt", b"hello", "text/plain")},
-            headers=headers,
-        )
-        # pending user CAN upload files (no enforce_approval on upload)
-        # but should they be able to? Let's verify the current behavior
-        assert r.status_code in (201, 403)
-
-
-class TestSystemPromptProtection:
-    """Verify system prompt content is never leaked to non-admin users."""
-
-    async def test_non_admin_cannot_list_prompts(self, client, regular_user_token):
-        headers = {"Authorization": f"Bearer {regular_user_token}"}
-        r = await client.get("/api/v1/system-prompts", headers=headers)
-        assert r.status_code == 403
-
-    async def test_non_admin_cannot_get_prompt(self, client, regular_user_token):
-        headers = {"Authorization": f"Bearer {regular_user_token}"}
-        r = await client.get("/api/v1/system-prompts/000000000000000000000000", headers=headers)
-        assert r.status_code == 403
-
-    async def test_admin_can_list_prompts(self, client, admin_token):
-        headers = {"Authorization": f"Bearer {admin_token}"}
-        r = await client.get("/api/v1/system-prompts", headers=headers)
-        assert r.status_code == 200
-
-    async def test_summary_is_public(self, client, regular_user_token):
-        headers = {"Authorization": f"Bearer {regular_user_token}"}
-        r = await client.get("/api/v1/system-prompts/summary", headers=headers)
-        assert r.status_code == 200
-
-
 class TestModelAccess:
-    """The static notrack model catalogue is read-only and keyless."""
+    """The static notrack model catalogue is read-only and credential-less."""
 
     async def test_models_list_is_static(self, client, regular_user_token):
         headers = {"Authorization": f"Bearer {regular_user_token}"}
@@ -239,21 +135,21 @@ class TestModelAccess:
         data = r.json()
         assert len(data) == 4
         for model in data:
-            assert model["provider"] == "internal"
             assert "apiKey" not in model
-            assert model.get("hasApiKey") is False
+            assert "provider" not in model
+            assert "hasApiKey" not in model
 
-    async def test_model_create_removed(self, client, admin_token):
-        headers = {"Authorization": f"Bearer {admin_token}"}
+    async def test_model_create_removed(self, client, regular_user_token):
+        headers = {"Authorization": f"Bearer {regular_user_token}"}
         r = await client.post(
             "/api/v1/models",
-            json={"name": "test-model", "provider": "notrack"},
+            json={"name": "test-model"},
             headers=headers,
         )
         assert r.status_code in (404, 405)
 
-    async def test_developer_routes_removed(self, client, admin_token):
-        headers = {"Authorization": f"Bearer {admin_token}"}
+    async def test_developer_routes_removed(self, client, regular_user_token):
+        headers = {"Authorization": f"Bearer {regular_user_token}"}
         r = await client.post(
             "/api/v1/developer/models/000000000000000000000000/reveal",
             headers=headers,

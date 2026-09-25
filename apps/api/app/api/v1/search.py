@@ -23,9 +23,6 @@ async def search(
 ) -> SearchResponse:
     started = time.perf_counter()
     requested = set(kinds.split(",")) if kinds else {"conversation", "message", "model", "canvas", "memory"}
-    is_admin = user.get("role") in ("admin", "superadmin")
-    if is_admin:
-        requested.add("user")
     hits: list[SearchHit] = []
 
     async def push(kind: str, id_: str, title: str, snippet: str, score: float, **extra):
@@ -81,18 +78,6 @@ async def search(
         ).limit(limit)
         async for d in cursor:
             await push("memory", str(d["_id"]), f"Memory: {d.get('kind', 'long_term')}", d["content"][:200], 0.4)
-
-    # users (admin only)
-    if "user" in requested and is_admin:
-        cursor = mongo.users().find(
-            {"$or": [
-                {"username": {"$regex": q, "$options": "i"}},
-                {"email": {"$regex": q, "$options": "i"}},
-            ]},
-            {"username": 1, "email": 1, "role": 1, "status": 1},
-        ).limit(limit)
-        async for d in cursor:
-            await push("user", str(d["_id"]), d["username"], f"{d['email']} · {d['role']} · {d['status']}", 0.6, email=d["email"], role=d["role"], status=d["status"])
 
     hits.sort(key=lambda h: h.score, reverse=True)
     return SearchResponse(query=q, hits=hits[:limit], took_ms=int((time.perf_counter() - started) * 1000))

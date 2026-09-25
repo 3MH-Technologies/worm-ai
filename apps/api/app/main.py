@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +14,6 @@ from app.cache import redis as redis_cache
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.middleware import CSRFMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
-from app.core.security import hash_password
 from app.db import mongo
 
 configure_logging()
@@ -31,7 +29,6 @@ async def lifespan(app: FastAPI):
     try:
         await mongo.connect()
         await _ensure_indexes()
-        await _bootstrap_admin()
         log.info("worm-ai ready env=%s", settings.env)
     except Exception as e:
         log.error("database unavailable at boot: %s — set MONGO_URI in the environment", e)
@@ -49,61 +46,6 @@ async def _ensure_indexes() -> None:
     from app.db import mongo
     from app.db.mongo import _ensure_indexes as _db_ensure
     await _db_ensure(mongo.db())
-
-
-async def _bootstrap_admin() -> None:
-    """Seed a fresh install only: never modify accounts that already exist.
-
-    Runs exclusively when the ``users`` collection is completely empty.
-    Existing admins keep their UI-changed passwords across restarts (the
-    old behaviour silently reset them from env on every boot), and no
-    account with hardcoded credentials is ever created — new users go
-    through registration + admin approval.
-    """
-    now = datetime.now(tz=UTC)
-    created = 0
-
-    if await mongo.users().find_one({}, projection={"_id": 1}) is None:
-        await mongo.users().insert_one({
-            "username": settings.bootstrap_admin_username,
-            "email": settings.bootstrap_admin_email.lower(),
-            "passwordHash": hash_password(settings.bootstrap_admin_password),
-            "role": "superadmin",
-            "status": "approved",
-            "avatar": None,
-            "createdAt": now,
-            "updatedAt": now,
-            "lastLogin": None,
-            "failedLoginAttempts": 0,
-            "lockedUntil": None,
-        })
-        log.info("bootstrap admin created: %s", settings.bootstrap_admin_email.lower())
-        created += 1
-
-    if await mongo.system_prompts().count_documents({"name": "worm-ai Default"}) == 0:
-        await mongo.system_prompts().insert_one({
-            "name": "worm-ai Default",
-            "description": "Helpful, accurate, concise assistant.",
-            "content": "You are worm-ai, a helpful, accurate, and concise AI assistant. "
-                       "When unsure, say you don't know. Cite sources when relevant.",
-            "tags": ["general"],
-            "active": True,
-            "currentVersion": 1,
-            "versions": [{
-                "version": 1,
-                "content": "You are worm-ai, a helpful, accurate, and concise AI assistant. "
-                           "When unsure, say you don't know. Cite sources when relevant.",
-                "changelog": "initial",
-                "createdAt": now,
-            }],
-            "createdAt": now,
-            "updatedAt": now,
-        })
-        log.info("bootstrap system prompt created")
-        created += 1
-
-    if created:
-        log.info("bootstrap complete: %d items created", created)
 
 
 app = FastAPI(

@@ -47,24 +47,24 @@ class TestPasswordHash:
 
 class TestJWT:
     def test_access_token_structure(self):
-        token = create_access_token(sub="abc123", role="user")
+        token = create_access_token(sub="abc123")
         payload = decode_token(token)
         assert payload["sub"] == "abc123"
-        assert payload["role"] == "user"
+        assert "role" not in payload
         assert payload["type"] == "access"
         assert "jti" in payload
         assert "iat" in payload
         assert "exp" in payload
 
     def test_access_ttl(self):
-        token = create_access_token(sub="x", role="admin")
+        token = create_access_token(sub="x")
         payload = decode_token(token)
         exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
         expected = datetime.now(tz=timezone.utc) + timedelta(minutes=30)
         assert abs((exp - expected).total_seconds()) < 10
 
     def test_session_id_in_access(self):
-        token = create_access_token(sub="x", role="user", session_id="sess1")
+        token = create_access_token(sub="x", session_id="sess1")
         payload = decode_token(token)
         assert payload["sid"] == "sess1"
 
@@ -82,7 +82,7 @@ class TestJWT:
         assert abs((exp - expected).total_seconds()) < 10
 
     def test_jti_uniqueness(self):
-        jtis = {decode_token(create_access_token(sub="x", role="user"))["jti"] for _ in range(10)}
+        jtis = {decode_token(create_access_token(sub="x"))["jti"] for _ in range(10)}
         assert len(jtis) == 10
 
     def test_expired_token_raises(self):

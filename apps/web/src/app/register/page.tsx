@@ -2,7 +2,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Skull, ArrowRight, Loader2, Shield } from 'lucide-react'
+import { ArrowRight, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,7 +17,6 @@ export default function RegisterPage() {
   const [username, setUsername] = React.useState('')
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
-  const [done, setDone] = React.useState(false)
 
   React.useEffect(() => { if (user) router.replace('/c') }, [user, router])
 
@@ -25,32 +24,10 @@ export default function RegisterPage() {
     e.preventDefault()
     try {
       await register(username, email, password)
-      setDone(true)
+      router.replace('/c')
     } catch (err) {
       toast.error(apiError(err))
     }
-  }
-
-  if (done) {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <Card className="w-full max-w-md border-border/50 bg-card/80 backdrop-blur">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-evil-500/10">
-              <Shield className="h-6 w-6 text-evil-500" />
-            </div>
-            <CardTitle className="text-xl">Access requested</CardTitle>
-            <CardDescription>
-              Your account is pending administrator approval. You&apos;ll receive access once an admin verifies your identity.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button asChild className="w-full gradient-brand text-white"><Link href="/login">Back to sign in</Link></Button>
-            <Button asChild variant="outline" className="w-full"><Link href="/">Go home</Link></Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   return (
@@ -65,8 +42,8 @@ export default function RegisterPage() {
         </div>
         <Card className="border-border/50 bg-card/80 backdrop-blur">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">Request access</CardTitle>
-            <CardDescription>Create an account. Admin approval required.</CardDescription>
+            <CardTitle className="text-xl">Create your account</CardTitle>
+            <CardDescription>Sign up and start chatting right away.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={onSubmit}>
@@ -87,7 +64,7 @@ export default function RegisterPage() {
               </Button>
             </form>
             <p className="mt-5 text-center text-sm text-muted-foreground">
-              Already have access? <Link href="/login" className="text-primary hover:underline font-medium">Sign in</Link>
+              Already have an account? <Link href="/login" className="text-primary hover:underline font-medium">Sign in</Link>
             </p>
           </CardContent>
         </Card>

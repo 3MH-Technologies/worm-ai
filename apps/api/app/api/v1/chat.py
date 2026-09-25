@@ -13,7 +13,7 @@ from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.deps import current_user, enforce_approval, rate_limit
+from app.api.deps import current_user, rate_limit
 from app.core.config import get_settings
 from app.db import mongo
 from app.models.chat import (
@@ -146,7 +146,6 @@ async def list_conversations(
 
 @router.post("/conversations", response_model=ConversationOut, status_code=201)
 async def create_conversation(payload: ConversationCreate, user=Depends(current_user)) -> ConversationOut:
-    await enforce_approval(user)
     now = datetime.now(tz=UTC)
     model_id = (payload.modelId or "").strip()
     if len(model_id) == 1:
@@ -226,7 +225,6 @@ async def delete_conversation(cid: str, user=Depends(current_user)) -> None:
 async def post_message(cid: str, payload: MessageCreate, user=Depends(current_user), _: None = Depends(rate_limit)) -> MessageOut:
     """Non-streaming message send. Returns the saved user message; assistant reply
     can be fetched via /stream. Prefer /stream for chat UX."""
-    await enforce_approval(user)
     if not payload.content.strip():
         raise HTTPException(400, "message content is required")
     conv = await mongo.conversations().find_one({"_id": ObjectId(cid), "userId": user["_id"]})
@@ -375,7 +373,6 @@ async def stream_message(
     user=Depends(current_user),
     _: None = Depends(rate_limit),
 ) -> EventSourceResponse:
-    await enforce_approval(user)
     conv = await mongo.conversations().find_one({"_id": ObjectId(cid), "userId": user["_id"]})
     if not conv:
         raise HTTPException(404, "conversation not found")

@@ -61,7 +61,6 @@ def auth_header(token: str) -> dict[str, str]:
 
 async def _make_user(
     uid: str,
-    role: str = "user",
     status: str = "approved",
 ) -> dict[str, Any]:
     await mongo.connect()
@@ -72,7 +71,6 @@ async def _make_user(
             "username": f"user_{uid[-6:]}",
             "email": f"{uid[-6:]}@test.local",
             "passwordHash": hash_password("TestPass123!"),
-            "role": role,
             "status": status,
             "avatar": None,
             "createdAt": now,
@@ -89,59 +87,40 @@ async def _make_user(
 
 @pytest_asyncio.fixture
 async def regular_user() -> dict[str, Any]:
-    return await _make_user("000000000000000000000001", "user", "approved")
+    return await _make_user("000000000000000000000001")
 
 
 @pytest_asyncio.fixture
 async def regular_user_token(regular_user) -> str:
-    return create_access_token(sub=str(regular_user["_id"]), role="user")
+    return create_access_token(sub=str(regular_user["_id"]))
 
 
 @pytest_asyncio.fixture
-async def admin_user() -> dict[str, Any]:
-    return await _make_user("000000000000000000000002", "admin", "approved")
+async def second_user() -> dict[str, Any]:
+    """A different regular user — used to verify ownership/IDOR checks."""
+    return await _make_user("000000000000000000000007")
 
 
 @pytest_asyncio.fixture
-async def admin_token(admin_user) -> str:
-    return create_access_token(sub=str(admin_user["_id"]), role="admin")
-
-
-@pytest_asyncio.fixture
-async def superadmin_user() -> dict[str, Any]:
-    return await _make_user("000000000000000000000003", "superadmin", "approved")
-
-
-@pytest_asyncio.fixture
-async def superadmin_token(superadmin_user) -> str:
-    return create_access_token(sub=str(superadmin_user["_id"]), role="superadmin")
-
-
-@pytest_asyncio.fixture
-async def pending_user() -> dict[str, Any]:
-    return await _make_user("000000000000000000000004", "user", "pending")
-
-
-@pytest_asyncio.fixture
-async def pending_user_token(pending_user) -> str:
-    return create_access_token(sub=str(pending_user["_id"]), role="user")
+async def second_user_token(second_user) -> str:
+    return create_access_token(sub=str(second_user["_id"]))
 
 
 @pytest_asyncio.fixture
 async def suspended_user() -> dict[str, Any]:
-    return await _make_user("000000000000000000000005", "user", "suspended")
+    return await _make_user("000000000000000000000005", "suspended")
 
 
 @pytest_asyncio.fixture
 async def suspended_user_token(suspended_user) -> str:
-    return create_access_token(sub=str(suspended_user["_id"]), role="user")
+    return create_access_token(sub=str(suspended_user["_id"]))
 
 
 @pytest_asyncio.fixture
 async def rejected_user() -> dict[str, Any]:
-    return await _make_user("000000000000000000000006", "user", "rejected")
+    return await _make_user("000000000000000000000006", "rejected")
 
 
 @pytest_asyncio.fixture
 async def rejected_user_token(rejected_user) -> str:
-    return create_access_token(sub=str(rejected_user["_id"]), role="user")
+    return create_access_token(sub=str(rejected_user["_id"]))

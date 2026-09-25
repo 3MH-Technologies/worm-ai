@@ -158,7 +158,7 @@ async def download(attachment_id: str, user=Depends(current_user)):
     doc = await mongo.attachments().find_one({"_id": ObjectId(attachment_id)})
     if not doc:
         raise HTTPException(404, "not found")
-    if str(doc["userId"]) != str(user["_id"]) and user.get("role") not in ("admin", "superadmin"):
+    if str(doc["userId"]) != str(user["_id"]):
         raise HTTPException(403, "forbidden")
     path = _storage_dir() / doc["storageKey"]
     if not path.exists():

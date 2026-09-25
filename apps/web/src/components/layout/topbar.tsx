@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import {
   ChevronDown, LogOut, User as UserIcon, Settings, Sun, Moon, Laptop,
-  PanelLeftOpen, SquarePen, Share2, Shield, Bot,
+  PanelLeftOpen, SquarePen, Share2, Bot,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useUIStore } from '@/stores/ui'
@@ -117,7 +117,7 @@ export function TopBar() {
         ) : (
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-lg font-semibold transition-colors hover:bg-accent focus-visible:outline-none">
-              <span>{selected?.displayName || selected?.name || 'ChatGPT'}</span>
+              <span>{selected?.displayName || selected?.name || 'Worm Core'}</span>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-80 rounded-2xl p-1.5">
@@ -171,11 +171,6 @@ export function TopBar() {
             <DropdownMenuItem onClick={() => router.push('/settings')} className="rounded-lg px-3 py-2">
               <Settings className="h-4 w-4" /> Settings
             </DropdownMenuItem>
-            {user?.role && ['admin', 'superadmin', 'developer'].includes(user.role) && (
-              <DropdownMenuItem onClick={() => router.push('/admin')} className="rounded-lg px-3 py-2">
-                <Shield className="h-4 w-4" /> Admin panel
-              </DropdownMenuItem>
-            )}
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="px-3 py-1 text-xs text-muted-foreground">Theme</DropdownMenuLabel>
             <DropdownMenuRadioGroup value={theme} onValueChange={(v) => setTheme(v as any)}>

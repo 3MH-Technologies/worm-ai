@@ -9,16 +9,17 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { TopBar } from '@/components/layout/topbar'
 import { api, apiError } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import { Save, Camera, BadgeCheck, Shield } from 'lucide-react'
+import { Save, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatRelative } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
+import { useAuthImageUrl } from '@/lib/auth-image'
 
 export default function ProfilePage() {
   const { user, refreshMe } = useAuthStore()
   const qc = useQueryClient()
   const [username, setUsername] = React.useState(user?.username || '')
   const [avatar, setAvatar] = React.useState(user?.avatar || '')
+  const avatarSrc = useAuthImageUrl(avatar)
 
   React.useEffect(() => {
     setUsername(user?.username || '')
@@ -67,7 +68,7 @@ export default function ProfilePage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
-                    {avatar ? <AvatarImage src={avatar} alt={user.username} /> : null}
+                    {avatarSrc ? <AvatarImage src={avatarSrc} alt={user.username} /> : null}
                     <AvatarFallback className="bg-gradient-to-br from-brand-500 to-violet-500 text-lg text-white">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col gap-2">
@@ -103,13 +104,6 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <Row label="Email" value={user.email} />
-                <Row label="Role" value={
-                  <Badge variant={user.role === 'superadmin' ? 'default' : user.role === 'admin' ? 'default' : 'secondary'}>
-                    {user.role === 'superadmin' ? <Shield className="mr-1 h-3 w-3" /> : <BadgeCheck className="mr-1 h-3 w-3" />}
-                    {user.role}
-                  </Badge>
-                } />
-                <Row label="Status" value={<Badge variant={user.status === 'approved' ? 'success' : 'warning'}>{user.status}</Badge>} />
                 <Row label="Joined" value={user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'} />
                 <Row label="Last login" value={user.lastLogin ? formatRelative(user.lastLogin) : '—'} />
               </CardContent>

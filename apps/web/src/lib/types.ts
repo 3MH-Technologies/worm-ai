@@ -3,9 +3,6 @@
  * Keep these in sync with apps/api/app/models/*.py
  */
 
-export type Role = 'user' | 'moderator' | 'developer' | 'admin' | 'superadmin'
-export type Status = 'pending' | 'approved' | 'rejected' | 'suspended'
-export type Provider = 'internal' | 'custom'
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool'
 export type CanvasType = 'document' | 'code' | 'markdown' | 'project' | 'research'
 export type MemoryKind = 'long_term' | 'context' | 'session' | 'preference'
@@ -14,8 +11,6 @@ export interface PublicUser {
   id: string
   username: string
   email: string
-  role: Role
-  status: Status
   avatar?: string | null
   createdAt?: string
   lastLogin?: string | null
@@ -31,13 +26,9 @@ export interface AuthResponse {
 export interface ModelRecord {
   id: string
   name: string
-  provider: Provider
-  endpoint?: string | null
   temperature: number
   maxTokens: number
   topP: number
-  systemPromptId?: string | null
-  systemPromptName?: string | null
   enabled: boolean
   description?: string | null
   displayName?: string | null
@@ -45,14 +36,12 @@ export interface ModelRecord {
   tags: string[]
   createdAt: string
   updatedAt: string
-  hasApiKey: boolean
 }
 
 export interface AgentModelRecord {
   id: string
   name: string
   description?: string | null
-  provider: string
   enabled: boolean
   configured: boolean
 }
@@ -88,31 +77,6 @@ export interface MessageRecord {
 
 export interface ConversationWithMessages extends ConversationRecord {
   messages: MessageRecord[]
-}
-
-export interface SystemPromptSummary {
-  id: string
-  name: string
-  description?: string | null
-}
-
-export interface SystemPromptVersion {
-  version: number
-  content: string
-  changelog?: string | null
-  createdAt: string
-}
-
-export interface SystemPromptRecord {
-  id: string
-  name: string
-  description?: string | null
-  tags: string[]
-  active: boolean
-  currentVersion: number
-  versions: SystemPromptVersion[]
-  createdAt: string
-  updatedAt: string
 }
 
 export interface CanvasRecord {
@@ -204,19 +168,8 @@ export interface MemoryRecord {
   lastUsedAt?: string | null
 }
 
-export interface AuditLogRecord {
-  id: string
-  actorId: string
-  actorUsername?: string | null
-  action: string
-  resource: string
-  ipAddress?: string | null
-  userAgent?: string | null
-  timestamp: string
-}
-
 export interface SearchHit {
-  kind: 'conversation' | 'message' | 'user' | 'model' | 'canvas' | 'memory'
+  kind: 'conversation' | 'message' | 'model' | 'canvas' | 'memory'
   id: string
   title: string
   snippet: string
@@ -228,13 +181,6 @@ export interface SearchResponse {
   query: string
   hits: SearchHit[]
   took_ms: number
-}
-
-export interface UserListOut {
-  items: PublicUser[]
-  total: number
-  page: number
-  size: number
 }
 
 export interface SessionRecord {
@@ -257,33 +203,4 @@ export interface AttachmentRecord {
   originalName: string
   url: string
   createdAt: string
-}
-
-export interface ErrorEvent {
-  id: string
-  kind: string
-  message: string
-  path?: string | null
-  method?: string | null
-  status?: number | null
-  actorId?: string | null
-  createdAt: string
-}
-
-export interface AdminStats {
-  totalUsers: number
-  pendingUsers: number
-  activeUsers24h: number
-  totalConversations: number
-  totalMessages: number
-  totalTokens: number
-  tokensToday: number
-  messagesToday: number
-  activeModels: number
-  errorRate: number
-  revenue: number
-  generatedAt: string
-  recentRegistrations: PublicUser[]
-  recentAudit: AuditLogRecord[]
-  recentErrors: ErrorEvent[]
 }

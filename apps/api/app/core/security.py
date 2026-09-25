@@ -6,7 +6,7 @@ import hashlib
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any
 
 import bcrypt
 import jwt
@@ -29,13 +29,9 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 # ---- JWT ----
-Role = Literal["user", "moderator", "admin", "superadmin"]
-
-
 def create_access_token(
     *,
     sub: str,
-    role: Role,
     session_id: str | None = None,
     extra: dict[str, Any] | None = None,
 ) -> str:
@@ -43,7 +39,6 @@ def create_access_token(
     now = datetime.now(tz=UTC)
     payload: dict[str, Any] = {
         "sub": sub,
-        "role": role,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=s.jwt_access_ttl_min)).timestamp()),
         "type": "access",

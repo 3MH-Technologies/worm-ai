@@ -39,7 +39,7 @@ settings = get_settings()
 async def _build_tokens(user: dict, request: Request) -> TokenPair:
     uid = str(user["_id"])
     session_id = new_csrf_token()
-    access = create_access_token(sub=uid, role=user.get("role", "user"), session_id=session_id)
+    access = create_access_token(sub=uid, session_id=session_id)
     refresh, exp = create_refresh_token(sub=uid, session_id=session_id)
     # Persist refresh token for rotation / revocation tracking
     await mongo.refresh_tokens().insert_one({
@@ -67,16 +67,12 @@ async def register(payload: RegisterIn, request: Request) -> TokenPair:
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "email or username already in use")
 
-    # First user ever becomes superadmin + approved automatically
-    is_first = await mongo.users().count_documents({}) == 0
-
     now = datetime.now(tz=UTC)
     doc = {
         "username": payload.username,
         "email": payload.email.lower(),
         "passwordHash": hash_password(payload.password),
-        "role": "superadmin" if is_first else "user",
-        "status": "approved" if is_first else "pending",  # first user auto-approved
+        "status": "approved",  # instant access — no approval workflow
         "avatar": None,
         "createdAt": now,
         "updatedAt": now,
@@ -106,17 +102,6 @@ async def register(payload: RegisterIn, request: Request) -> TokenPair:
         ip=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
-
-    # Send a notification to all super admins
-    async for admin in mongo.users().find({"role": {"$in": ["admin", "superadmin"]}}, {"_id": 1}):
-        await mongo.notifications().insert_one({
-            "userId": admin["_id"],
-            "title": "New user pending approval",
-            "body": f"{payload.username} ({payload.email}) just signed up.",
-            "kind": "info",
-            "read": False,
-            "createdAt": now,
-        })
 
     return await _build_tokens(doc, request)
 

@@ -82,6 +82,6 @@ def test_models_catalogue_is_static_and_keyless():
     from app.api.v1.models import _to_out
     outs = [_to_out(code) for code in notrack.NOTRACK_MODELS]
     assert {o.id for o in outs} == {"A", "B", "C", "F"}
-    assert all(o.provider == "internal" for o in outs)
-    assert all(not o.hasApiKey for o in outs)
+    assert all(not hasattr(o, "provider") for o in outs)
+    assert all(not hasattr(o, "hasApiKey") for o in outs)
     assert all(o.enabled for o in outs)

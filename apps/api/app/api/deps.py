@@ -1,4 +1,4 @@
-"""FastAPI dependencies: current user, RBAC, rate limiting."""
+"""FastAPI dependencies: current user, rate limiting."""
 
 from __future__ import annotations
 
@@ -61,28 +61,6 @@ async def optional_user(
         return None
 
 
-def require_role(*allowed: str):
-    async def _dep(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
-        if user.get("role") not in allowed:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient permissions")
-        return user
-    return _dep
-
-
-require_admin = require_role("admin", "superadmin")
-require_super = require_role("superadmin")
-require_mod = require_role("moderator", "admin", "superadmin")
-require_approved = require_role("user", "moderator", "admin", "superadmin")
-
-
-async def enforce_approval(user: dict[str, Any]) -> None:
-    if user.get("status") != "approved":
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            f"account status is '{user.get('status')}'; wait for admin approval",
-        )
-
-
 async def rate_limit(
     request: Request,
     user: dict[str, Any] | None = Depends(optional_user),
@@ -118,8 +96,7 @@ def public_user(u: dict[str, Any]) -> dict[str, Any]:
         "id": str(u["_id"]),
         "username": u["username"],
         "email": u["email"],
-        "role": u.get("role", "user"),
-        "status": u.get("status", "pending"),
+        "status": u.get("status", "approved"),
         "avatar": u.get("avatar"),
         "createdAt": u.get("createdAt"),
         "lastLogin": u.get("lastLogin"),

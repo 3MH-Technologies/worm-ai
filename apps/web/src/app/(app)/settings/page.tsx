@@ -70,14 +70,6 @@ export default function SettingsPage() {
                   <label className="text-sm font-medium">Email</label>
                   <Input value={user?.email || ''} disabled />
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Role</label>
-                  <Input value={user?.role || ''} disabled />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Status</label>
-                  <Input value={user?.status || ''} disabled />
-                </div>
                 <Button onClick={() => saveProfile.mutate()} disabled={saveProfile.isPending}><Save className="h-4 w-4" /> Save</Button>
               </CardContent>
             </Card>

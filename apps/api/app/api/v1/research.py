@@ -12,7 +12,7 @@ from bson import ObjectId
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.deps import current_user, enforce_approval, rate_limit
+from app.api.deps import current_user, rate_limit
 from app.api.v1.web import _ddg_search, _fetch_content, _serper_search, _tavily_search
 from app.core.config import get_settings
 from app.db import mongo
@@ -92,10 +92,12 @@ async def run_research(
     user=Depends(current_user),
     _: None = Depends(rate_limit),
 ) -> ResearchReport:
-    await enforce_approval(user)
     sources = await _gather_sources(payload.query, payload.maxSources)
     if not sources:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "no sources retrieved")
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "Web search returned no sources for that query — try rephrasing it.",
+        )
 
     prompt = _build_prompt(payload.query, sources)
     report_text, _ = await notrack.get_notrack().complete(prompt, model=_model_code(payload.modelId))
@@ -146,7 +148,6 @@ async def stream_research(
     _: None = Depends(rate_limit),
 ):
     """SSE variant: emits sources first, then streams the report deltas, then a done event."""
-    await enforce_approval(user)
     sources = await _gather_sources(payload.query, payload.maxSources)
     prompt = _build_prompt(payload.query, sources)
     model = _model_code(payload.modelId)

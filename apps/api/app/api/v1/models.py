@@ -25,13 +25,9 @@ def _to_out(code: str) -> ModelOut:
     return ModelOut(
         id=code,
         name=name,
-        provider="internal",
-        endpoint=None,
         temperature=0.7,
         maxTokens=32768,
         topP=1.0,
-        systemPromptId=None,
-        systemPromptName=None,
         enabled=True,
         description=NOTRACK_MODEL_DESCRIPTIONS.get(code),
         displayName=name,
@@ -39,7 +35,6 @@ def _to_out(code: str) -> ModelOut:
         tags=["notrack"],
         createdAt=_EPOCH,
         updatedAt=_EPOCH,
-        hasApiKey=False,
     )
 
 

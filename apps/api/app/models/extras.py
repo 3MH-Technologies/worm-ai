@@ -7,9 +7,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app.models import PublicUser
-from app.models.auth import AuditLogOut
-
 CanvasType = Literal["document", "code", "markdown", "project", "research"]
 
 
@@ -120,7 +117,7 @@ class MemoryCreate(BaseModel):
 
 
 class SearchHit(BaseModel):
-    kind: Literal["conversation", "message", "user", "model", "canvas", "memory"]
+    kind: Literal["conversation", "message", "model", "canvas", "memory"]
     id: str
     title: str
     snippet: str
@@ -132,32 +129,3 @@ class SearchResponse(BaseModel):
     query: str
     hits: list[SearchHit]
     took_ms: int
-
-
-class AdminStats(BaseModel):
-    totalUsers: int
-    pendingUsers: int
-    activeUsers24h: int
-    totalConversations: int
-    totalMessages: int
-    totalTokens: int
-    tokensToday: int
-    messagesToday: int
-    activeModels: int
-    errorRate: float
-    revenue: float = 0.0
-    generatedAt: datetime
-    recentRegistrations: list[PublicUser] = Field(default_factory=list)
-    recentAudit: list[AuditLogOut] = Field(default_factory=list)
-    recentErrors: list[ErrorEvent] = Field(default_factory=list)
-
-
-class ErrorEvent(BaseModel):
-    id: str
-    kind: str = "server"
-    message: str
-    path: str | None = None
-    method: str | None = None
-    status: int | None = None
-    actorId: str | None = None
-    createdAt: datetime

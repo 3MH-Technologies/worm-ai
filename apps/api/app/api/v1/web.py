@@ -14,7 +14,7 @@ import httpx
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import current_user, enforce_approval
+from app.api.deps import current_user
 from app.core.config import get_settings
 from app.models.extras import WebSearchRequest, WebSearchResponse, WebSearchResult
 
@@ -218,7 +218,6 @@ async def _fetch_content(url: str) -> str:
 
 @router.post("/search", response_model=WebSearchResponse)
 async def search(payload: WebSearchRequest, user=Depends(current_user)) -> WebSearchResponse:
-    await enforce_approval(user)
     settings = get_settings()
     start = time.perf_counter()
     provider = settings.web_search_provider
@@ -251,6 +250,5 @@ async def search(payload: WebSearchRequest, user=Depends(current_user)) -> WebSe
 @router.get("/fetch")
 async def fetch_url(url: str, user=Depends(current_user)) -> dict:
     """Fetch a URL and return sanitised text content."""
-    await enforce_approval(user)
     text = await _fetch_content(url)
     return {"url": url, "content": text, "fetchedAt": datetime.now(tz=UTC)}

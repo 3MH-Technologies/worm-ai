@@ -36,7 +36,8 @@ class TestRegister:
         assert "accessToken" in data
         assert "refreshToken" in data
         assert data["user"]["username"] == "newuser"
-        assert data["user"]["status"] == "pending"
+        assert data["user"]["status"] == "approved"
+        assert "role" not in data["user"]
 
     async def test_register_duplicate_email(self, client, regular_user):
         payload = {
@@ -175,7 +176,7 @@ class TestRefresh:
     async def test_refresh_wrong_type_fails(self, client):
         from app.core.security import create_access_token
 
-        access = create_access_token(sub="000000000000000000000001", role="user")
+        access = create_access_token(sub="000000000000000000000001")
         r = await client.post("/api/v1/auth/refresh", json={"refreshToken": access})
         assert r.status_code == 401
 

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Search as SearchIcon, MessageSquare, FileText, Bot, User as UserIcon, Hash, NotebookPen } from 'lucide-react'
+import { Search as SearchIcon, MessageSquare, FileText, Bot, Hash, NotebookPen } from 'lucide-react'
 import { useDebounce } from 'use-debounce'
 import { api } from '@/lib/api'
 import { SearchHit, SearchResponse } from '@/lib/types'
@@ -17,7 +17,6 @@ const ICONS: Record<SearchHit['kind'], any> = {
   model: Bot,
   canvas: FileText,
   memory: NotebookPen,
-  user: UserIcon,
 }
 
 export default function SearchPage() {
@@ -52,7 +51,6 @@ export default function SearchPage() {
                   h.kind === 'message' ? `/c/${h.extra.conversationId}` :
                   h.kind === 'canvas' ? `/canvas/${h.id}` :
                   h.kind === 'model' ? '/c' :
-                  h.kind === 'user' ? `/admin/users?q=${encodeURIComponent(h.title)}` :
                   '/settings'
                 return (
                   <Link key={h.kind + h.id} href={href}>

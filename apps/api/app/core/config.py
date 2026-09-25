@@ -66,12 +66,6 @@ class Settings(BaseSettings):
     max_upload_mb: int = 20
     max_context_tokens: int = 32_000
 
-    # ---- Bootstrap admin ----
-    # Created only when the users collection is completely empty (fresh install).
-    bootstrap_admin_email: str = "admin@example.com"
-    bootstrap_admin_password: str = "Admin123!"
-    bootstrap_admin_username: str = "admin"
-
     @field_validator("jwt_secret", "csrf_secret", "encryption_key")
     @classmethod
     def _warn_default(cls, v: str, info) -> str:  # noqa: ANN001

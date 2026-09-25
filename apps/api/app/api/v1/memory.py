@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.deps import current_user, enforce_approval
+from app.api.deps import current_user
 from app.db import mongo
 from app.models.extras import MemoryCreate, MemoryItem
 
@@ -35,7 +35,6 @@ async def list_memory(user=Depends(current_user)) -> list[MemoryItem]:
 
 @router.post("", response_model=MemoryItem, status_code=status.HTTP_201_CREATED)
 async def add_memory(payload: MemoryCreate, user=Depends(current_user)) -> MemoryItem:
-    await enforce_approval(user)
     doc = {
         "userId": user["_id"],
         "kind": payload.kind,

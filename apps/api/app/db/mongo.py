@@ -70,10 +70,6 @@ def models_col():
     return db()["models"]
 
 
-def system_prompts():
-    return db()["system_prompts"]
-
-
 def audit_logs():
     return db()["audit_logs"]
 
@@ -122,17 +118,12 @@ def errors_log():
     return db()["errors_log"]
 
 
-def provider_keys():
-    return db()["provider_keys"]
-
-
 async def _ensure_indexes(d: AsyncIOMotorDatabase) -> None:
     """Create all required indexes. Idempotent."""
     # users
     await d["users"].create_index([("email", ASCENDING)], unique=True)
     await d["users"].create_index([("username", ASCENDING)], unique=True)
     await d["users"].create_index([("status", ASCENDING)])
-    await d["users"].create_index([("role", ASCENDING)])
 
     # conversations
     await d["conversations"].create_index([("userId", ASCENDING), ("updatedAt", DESCENDING)])
@@ -151,16 +142,6 @@ async def _ensure_indexes(d: AsyncIOMotorDatabase) -> None:
         name="msg_text_idx",
         default_language="english",
     )
-
-    # models
-    await d["models"].create_index([("name", ASCENDING), ("provider", ASCENDING)], unique=True)
-    await d["models"].create_index([("provider", ASCENDING)])
-
-    # provider keys
-    await d["provider_keys"].create_index([("provider", ASCENDING)], unique=True)
-
-    # system prompts
-    await d["system_prompts"].create_index([("name", ASCENDING), ("version", DESCENDING)])
 
     # audit logs
     await d["audit_logs"].create_index([("actorId", ASCENDING), ("timestamp", DESCENDING)])

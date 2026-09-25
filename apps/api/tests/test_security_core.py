@@ -58,10 +58,10 @@ class TestPasswordHashing:
 
 class TestJWT:
     def test_access_token_creation_and_decoding(self):
-        token = create_access_token(sub="user123", role="user")
+        token = create_access_token(sub="user123")
         payload = decode_token(token)
         assert payload["sub"] == "user123"
-        assert payload["role"] == "user"
+        assert "role" not in payload
         assert payload["type"] == "access"
         assert "jti" in payload
         assert "iat" in payload
@@ -71,7 +71,7 @@ class TestJWT:
         """Access token should expire after jwt_access_ttl_min."""
         short_ttl = 1 / 60  # 1 second
         # Override for test
-        token = create_access_token(sub="x", role="user")
+        token = create_access_token(sub="x")
         payload = decode_token(token)
         exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
         expected = datetime.now(tz=timezone.utc) + timedelta(minutes=settings.jwt_access_ttl_min)
@@ -86,7 +86,7 @@ class TestJWT:
         assert payload["sub"] == "user123"
 
     def test_jwt_algorithm_hs256(self, settings):
-        token = create_access_token(sub="x", role="user")
+        token = create_access_token(sub="x")
         # Parse without verification to check header
         header = jwt.get_unverified_header(token)
         assert header["alg"] == "HS256"
@@ -111,8 +111,8 @@ class TestJWT:
         assert payload["type"] == "refresh"
 
     def test_token_has_unique_jti(self):
-        t1 = create_access_token(sub="x", role="user")
-        t2 = create_access_token(sub="x", role="user")
+        t1 = create_access_token(sub="x")
+        t2 = create_access_token(sub="x")
         p1 = decode_token(t1)
         p2 = decode_token(t2)
         assert p1["jti"] != p2["jti"]
@@ -168,7 +168,7 @@ class TestFernetEncryption:
         assert decrypt("not-valid") == ""
 
     def test_api_key_presence(self):
-        """ModelOut.hasApiKey should reflect key presence, not value."""
+        """Secrets stay encrypted at rest when stored."""
         encrypted = encrypt("sk-test-123")
         assert encrypted  # Not empty
         assert encrypted != "sk-test-123"

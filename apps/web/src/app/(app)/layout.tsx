@@ -1,12 +1,11 @@
 'use client'
 import * as React from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/auth'
 import { Loader2 } from 'lucide-react'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const pathname = usePathname()
   const { user, refreshMe } = useAuthStore()
   const [ready, setReady] = React.useState(false)
 
@@ -21,22 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (ready && !user) router.replace('/login')
   }, [ready, user, router])
 
-  React.useEffect(() => {
-    if (!ready || !user) return
-    if (user.status !== 'approved' && pathname !== '/pending') {
-      router.replace('/pending')
-    }
-  }, [ready, user, pathname, router])
-
   if (!ready || !user) {
-    return (
-      <div className="grid h-screen w-screen place-items-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (user.status !== 'approved' && pathname !== '/pending') {
     return (
       <div className="grid h-screen w-screen place-items-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
