@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   SquarePen, Search, Trash2, Pencil, Check, X, PanelLeftClose, MoreHorizontal,
-  Settings, LogOut, User as UserIcon, Bot,
+  Settings, LogOut, User as UserIcon, Bot, Sparkles, FileSearch, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -122,6 +122,33 @@ export function Sidebar() {
           )}
         >
           <Bot className="h-4 w-4" /> Worm Agent
+        </Link>
+        <Link
+          href="/research"
+          className={cn(
+            'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/10',
+            pathname === '/research' && 'bg-black/10 dark:bg-white/10'
+          )}
+        >
+          <Sparkles className="h-4 w-4" /> Research
+        </Link>
+        <Link
+          href="/search"
+          className={cn(
+            'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/10',
+            pathname === '/search' && 'bg-black/10 dark:bg-white/10'
+          )}
+        >
+          <FileSearch className="h-4 w-4" /> Search all
+        </Link>
+        <Link
+          href="/canvas"
+          className={cn(
+            'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/10',
+            pathname.startsWith('/canvas') && 'bg-black/10 dark:bg-white/10'
+          )}
+        >
+          <FileText className="h-4 w-4" /> Canvases
         </Link>
         <button
           onClick={() => setSearchOpen((v) => !v)}
