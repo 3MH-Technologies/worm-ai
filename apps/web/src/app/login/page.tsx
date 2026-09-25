@@ -60,7 +60,7 @@ export default function LoginPage() {
               </Button>
             </form>
             <p className="mt-5 text-center text-sm text-muted-foreground">
-              No account? <Link href="/register" className="text-primary hover:underline font-medium">Request access</Link>
+              No account? <Link href="/register" className="text-primary hover:underline font-medium">Create account</Link>
             </p>
             <p className="mt-1 text-center text-sm text-muted-foreground">
               <Link href="/forgot" className="hover:text-foreground hover:underline">Forgot password?</Link>

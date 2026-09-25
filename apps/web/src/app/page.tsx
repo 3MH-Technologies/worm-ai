@@ -63,7 +63,7 @@ export default function HomePage() {
               <Terminal className="h-3.5 w-3.5" /> UNFILTERED AI — NO RULES. NO LIMITS.
             </span>
             <h1 className="mt-8 text-balance text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-7.5xl">
-              The AI that ChatGPT
+              The AI that big tech
               <br />
               <span className="text-gradient-red">won&apos;t let you build.</span>
             </h1>
@@ -77,7 +77,7 @@ export default function HomePage() {
                 <Link href="/register">Start building <ArrowRight className="h-4 w-4 ml-1.5" /></Link>
               </Button>
               <Button size="lg" variant="outline" asChild className="border-border/60 hover:bg-muted/40 transition-colors">
-                <Link href="/login">I have access</Link>
+                <Link href="/login">Sign in</Link>
               </Button>
             </div>
           </motion.div>
@@ -92,10 +92,10 @@ export default function HomePage() {
             {[
               { icon: Zap, title: 'Sub-second streaming', desc: 'Token-level streaming across every internal model — chat and coding agent modes.' },
               { icon: Bug, title: 'Red team ready', desc: 'Uncensored mode. No safety filters. No content policies. Your prompts, your responsibility.' },
-              { icon: Shield, title: 'Fort Knox backend', desc: 'Fernet-encrypted API keys at rest. JWT + CSRF double-submit. Rate limiting. Full audit trail.' },
+              { icon: Shield, title: 'Fort Knox backend', desc: 'JWT + CSRF double-submit. Rate limiting. Full audit trail.' },
               { icon: Brain, title: 'Worm Agent built in', desc: 'An autonomous coding agent with workspace file tools, web search, and full project builds.' },
-              { icon: Eye, title: 'Admin-controlled access', desc: 'Role-based permissions. User approval workflow. Complete oversight of every action.' },
-              { icon: Code, title: 'Admin dashboard', desc: 'Manage system prompts, users, and audit logs through a built-in admin dashboard.' },
+              { icon: Eye, title: 'Instant sign-up', desc: 'Create an account and start chatting right away — no forms, no waiting, no approval queue.' },
+              { icon: Code, title: 'Private by default', desc: 'Every conversation and canvas stays scoped to your own account.' },
             ].map(({ icon: Icon, title, desc }) => (
               <motion.div
                 key={title}
@@ -130,7 +130,7 @@ export default function HomePage() {
               </p>
               <div className="mt-8 flex justify-center gap-3">
                 <Button asChild className="gradient-brand text-white shadow-lg shadow-brand-500/10 transition-all hover:scale-[1.02]">
-                  <Link href="/register">Get access <ArrowRight className="h-4 w-4 ml-1" /></Link>
+                  <Link href="/register">Create account <ArrowRight className="h-4 w-4 ml-1" /></Link>
                 </Button>
               </div>
             </div>

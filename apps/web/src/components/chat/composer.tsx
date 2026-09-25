@@ -166,7 +166,7 @@ export function Composer({ onSend, onStop, streaming, placeholder, value: extern
         </div>
       </div>
       <p className="py-2 text-center text-[11px] leading-4 text-muted-foreground">
-        ChatGPT can make mistakes. Check important info.
+        worm-ai can make mistakes. Check important info.
       </p>
     </div>
   )

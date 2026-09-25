@@ -95,7 +95,17 @@ export default function ConversationPage() {
           regenerate: isRegen,
         }),
       })
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok || !res.body) {
+        // Surface the API's message (e.g. "Message is too long…") instead of "HTTP 400".
+        let detail = `Request failed (${res.status})`
+        try {
+          const body = await res.json()
+          const d = body?.detail ?? body?.error
+          if (typeof d === 'string') detail = d
+          else if (Array.isArray(d)) detail = d.map((x: any) => x?.msg).join(', ') || detail
+        } catch { /* non-JSON error body */ }
+        throw new Error(detail)
+      }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''

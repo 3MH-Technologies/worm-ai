@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Markdown } from '@/components/renderers/markdown'
 import { useMutation } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, apiError } from '@/lib/api'
 import { ResearchReport } from '@/lib/types'
 import { toast } from 'sonner'
 
@@ -22,7 +22,7 @@ export default function ResearchPage() {
   const run = useMutation({
     mutationFn: async () => (await api.post<ResearchReport>('/research/run', { query, maxSources: 8, saveAsCanvas: true })).data,
     onSuccess: (r) => { setReport(r); toast.success('Research complete') },
-    onError: (e: any) => toast.error(e?.message || 'Research failed'),
+    onError: (e) => toast.error(apiError(e)),
   })
 
   return (
@@ -47,7 +47,7 @@ export default function ResearchPage() {
                   <Globe className="h-4 w-4 text-muted-foreground" />
                   <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="What do you want to research?" />
                 </div>
-                <Button onClick={() => run.mutate()} disabled={!query.trim() || run.isPending} className="w-full">
+                <Button onClick={() => run.mutate()} disabled={query.trim().length < 3 || run.isPending} className="w-full">
                   {run.isPending ? 'Gathering sources…' : <>Run research <ArrowRight className="h-4 w-4" /></>}
                 </Button>
               </CardContent>

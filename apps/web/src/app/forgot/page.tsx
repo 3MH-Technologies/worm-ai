@@ -57,7 +57,7 @@ export default function ForgotPage() {
           <div className="grid h-9 w-9 place-items-center rounded-lg gradient-brand text-white shadow">
             <Bot className="h-4 w-4" />
           </div>
-          <span className="text-xl font-semibold">WormGPT</span>
+          <span className="text-xl font-semibold">worm-ai</span>
         </div>
         <Card>
           <CardHeader>

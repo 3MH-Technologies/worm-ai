@@ -1,10 +1,11 @@
 'use client'
 import * as React from 'react'
-import { Copy, Check, Pencil, RotateCw, ThumbsUp, ThumbsDown, FilePlus2, FileText, FolderTree, Trash2, Globe, Link as LinkIcon, Wrench } from 'lucide-react'
+import { Copy, Check, Pencil, RotateCw, ThumbsUp, ThumbsDown, FilePlus2, FileText, FolderTree, Trash2, Globe, Link as LinkIcon, Wrench, Paperclip } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Markdown } from '@/components/renderers/markdown'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { useAuthImageUrl } from '@/lib/auth-image'
 import { MessageRecord } from '@/lib/types'
 
 interface MessageBubbleProps {
@@ -22,6 +23,52 @@ const TOOL_ICONS: Record<string, any> = {
   delete_file: Trash2,
   web_search: Globe,
   fetch_url: LinkIcon,
+}
+
+type MessageAttachment = {
+  id?: string
+  kind?: string
+  name?: string
+  url?: string
+  mimeType?: string
+}
+
+/** Inline previews for whatever the user attached to this turn. */
+function Attachments({ items }: { items: MessageAttachment[] }) {
+  if (!items.length) return null
+  return (
+    <div className="mb-1.5 flex flex-wrap justify-end gap-2">
+      {items.map((a, i) =>
+        a.kind === 'image' && a.url ? (
+          <ImageAttachment key={a.id || i} item={a} />
+        ) : (
+          <span
+            key={a.id || i}
+            className="inline-flex max-w-64 items-center gap-1.5 rounded-xl border border-border bg-background/70 px-2.5 py-1.5 text-xs text-muted-foreground"
+          >
+            <Paperclip className="h-3 w-3 shrink-0" />
+            <span className="truncate">{a.name || 'attachment'}</span>
+          </span>
+        )
+      )}
+    </div>
+  )
+}
+
+function ImageAttachment({ item }: { item: MessageAttachment }) {
+  const src = useAuthImageUrl(item.url)
+  return (
+    <a href={item.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-border">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={item.name || 'attachment'} className="block max-h-60 max-w-64 object-cover" />
+      ) : (
+        <span className="inline-flex items-center gap-1.5 px-3 py-4 text-xs text-muted-foreground">
+          <Paperclip className="h-3 w-3" /> {item.name || 'image'}
+        </span>
+      )}
+    </a>
+  )
 }
 
 export function MessageBubble({ message, conversationId, isLast, isStreaming, onRegenerate }: MessageBubbleProps) {
@@ -85,6 +132,9 @@ export function MessageBubble({ message, conversationId, isLast, isStreaming, on
             </div>
           ) : (
             <>
+              {Array.isArray(message.metadata?.attachments) && message.metadata.attachments.length > 0 && (
+                <Attachments items={message.metadata.attachments} />
+              )}
               <div className="whitespace-pre-wrap break-words rounded-3xl bg-secondary px-5 py-2.5 text-[15px] leading-relaxed">
                 {message.content}
               </div>
