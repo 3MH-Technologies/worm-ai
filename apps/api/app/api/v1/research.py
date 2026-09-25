@@ -74,7 +74,7 @@ def _build_prompt(query: str, sources: list[ResearchSource]) -> str:
     body_budget = max((_PROMPT_CHAR_BUDGET - wrapper - header_total) // max(len(sources), 1), 0)
 
     blocks = []
-    for header, src in zip(headers, sources):
+    for header, src in zip(headers, sources, strict=False):
         body = src.content or src.snippet or ""
         if len(body) > body_budget:
             body = body[:body_budget]

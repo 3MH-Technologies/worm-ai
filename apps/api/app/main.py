@@ -88,7 +88,7 @@ async def unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
     log.exception("unhandled rid=%s err=%s", rid, exc)
     # best-effort persistence so admins can see the most recent server errors
     try:
-        from datetime import datetime
+        from datetime import UTC, datetime
 
         from app.db import mongo as _mongo
         await _mongo.errors_log().insert_one({
